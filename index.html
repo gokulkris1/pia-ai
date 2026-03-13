@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e0e10">
+<title>pia</title>
+<link rel="manifest" href="/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0e0e10;
+  --surface: #18181c;
+  --surface2: #222228;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0efe8;
+  --muted: #888780;
+  --accent: #5DCAA5;
+  --accent2: #1D9E75;
+  --danger: #E24B4A;
+  --warn: #EF9F27;
+  --info: #378ADD;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: var(--font-mono); font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  display: flex; flex-direction: column;
+  max-width: 480px; margin: 0 auto;
+  height: 100dvh; overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+.pia-logo { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+.pia-logo span { color: var(--accent); }
+.engine-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  padding: 4px 10px; border-radius: 20px;
+  border: 0.5px solid var(--border2); background: var(--surface);
+  transition: border-color 0.2s; font-family: var(--font-mono);
+}
+.engine-badge:hover { border-color: var(--accent); color: var(--accent); }
+.engine-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.status-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 20px; font-size: 11px; color: var(--muted);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0; min-height: 34px;
+}
+.status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.status-dot.listening { background: var(--warn); animation: pulse 1s infinite; }
+.status-dot.thinking { background: var(--info); animation: pulse 0.6s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.messages {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+}
+.msg { display: flex; flex-direction: column; gap: 4px; animation: slideIn 0.2s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.msg.user { align-items: flex-end; }
+.msg.pia { align-items: flex-start; }
+.msg-bubble {
+  max-width: 86%; padding: 10px 14px; border-radius: 14px;
+  line-height: 1.55; font-size: 13.5px;
+}
+.msg.user .msg-bubble {
+  background: var(--surface2); border: 0.5px solid var(--border2);
+  border-bottom-right-radius: 4px;
+}
+.msg.pia .msg-bubble {
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-bottom-left-radius: 4px; color: var(--text);
+}
+.msg-label { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; padding: 0 4px; }
+.skill-tag {
+  display: inline-block; font-size: 10px; padding: 2px 8px;
+  border-radius: 10px; background: rgba(93,202,165,0.12);
+  color: var(--accent); border: 0.5px solid rgba(93,202,165,0.25);
+  margin-bottom: 6px; letter-spacing: 0.05em;
+}
+.skills-row {
+  display: flex; gap: 6px; padding: 8px 20px 6px;
+  overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
+  border-top: 0.5px solid var(--border);
+}
+.skills-row::-webkit-scrollbar { display: none; }
+.skill-chip {
+  flex-shrink: 0; padding: 5px 12px; border-radius: 20px;
+  border: 0.5px solid var(--border2); background: var(--surface);
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  font-family: var(--font-mono); transition: all 0.15s; white-space: nowrap;
+}
+.skill-chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(93,202,165,0.08); }
+.input-area {
+  padding: 10px 16px 14px; border-top: 0.5px solid var(--border);
+  display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
+}
+.input-wrap { flex: 1; position: relative; }
+textarea {
+  width: 100%; background: var(--surface); border: 0.5px solid var(--border2);
+  border-radius: 14px; padding: 10px 14px;
+  color: var(--text); font-family: var(--font-mono); font-size: 13px;
+  resize: none; line-height: 1.5; max-height: 100px; min-height: 42px;
+  outline: none; transition: border-color 0.2s;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--muted); }
+.btn-icon {
+  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+  border: 0.5px solid var(--border2); background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; color: var(--muted);
+}
+.btn-icon:hover { border-color: var(--accent); color: var(--accent); background: rgba(93,202,165,0.08); }
+.btn-icon.voice:hover { border-color: var(--warn); color: var(--warn); background: rgba(239,159,39,0.08); }
+.btn-icon.voice.active { border-color: var(--warn); color: var(--warn); background: rgba(239,159,39,0.15); animation: pulse 0.8s infinite; }
+.btn-icon svg { width: 16px; height: 16px; pointer-events: none; }
+.typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+.typing-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: typingBounce 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+/* Settings panel */
+.settings-panel {
+  position: fixed; inset: 0; background: var(--bg); z-index: 200;
+  display: none; flex-direction: column;
+  max-width: 480px; margin: 0 auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.settings-panel.open { display: flex; }
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 0.5px solid var(--border);
+}
+.settings-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.btn-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1; }
+.settings-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+.settings-section-label { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+.engine-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 10px; border: 0.5px solid var(--border);
+  cursor: pointer; margin-bottom: 6px; transition: all 0.15s;
+}
+.engine-option.selected { border-color: var(--accent); background: rgba(93,202,165,0.06); }
+.engine-option-name { font-size: 13px; }
+.engine-option-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.radio-circle {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--border2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.engine-option.selected .radio-circle { border-color: var(--accent); }
+.radio-fill { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: none; }
+.engine-option.selected .radio-fill { display: block; }
+.skill-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 0.5px solid var(--border);
+}
+.skill-toggle:last-child { border-bottom: none; }
+.toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.toggle-name { font-size: 13px; }
+.toggle-sub { font-size: 11px; color: var(--muted); }
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px;
+  background: var(--surface2); border: 0.5px solid var(--border2);
+  cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--accent2); border-color: var(--accent); }
+.toggle-thumb {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--muted);
+  position: absolute; top: 2.5px; left: 3px; transition: all 0.2s;
+}
+.toggle.on .toggle-thumb { background: white; left: 18px; }
+.api-input-wrap { display: flex; flex-direction: column; gap: 6px; }
+.api-label { font-size: 11px; color: var(--muted); }
+.api-input {
+  background: var(--surface); border: 0.5px solid var(--border2); border-radius: 8px;
+  padding: 8px 12px; color: var(--text); font-family: var(--font-mono); font-size: 12px;
+  outline: none; width: 100%; transition: border-color 0.2s;
+}
+.api-input:focus { border-color: var(--accent); }
+.save-notice { font-size: 11px; color: var(--accent); height: 16px; transition: opacity 0.3s; opacity: 0; }
+.save-notice.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app" style="display:flex;flex-direction:column;height:100%;position:relative;">
+
+  <div class="topbar">
+    <div class="pia-logo">p<span>i</span>a</div>
+    <div class="engine-badge" onclick="openSettings()">
+      <div class="engine-dot"></div>
+      <span id="engine-label">claude</span>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">ready</span>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="msg pia">
+      <div class="msg-label">pia</div>
+      <div class="msg-bubble">
+        <div class="skill-tag">system</div><br>
+        hey — i'm pia. i can help with reminders, weather, search, and more. talk or type.<br><br>
+        <span style="color:var(--muted);font-size:12px;">tap the engine badge to add your api key and get started.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="skills-row">
+    <div class="skill-chip" onclick="quickSkill('weather')">weather</div>
+    <div class="skill-chip" onclick="quickSkill('reminder')">reminder</div>
+    <div class="skill-chip" onclick="quickSkill('search')">search</div>
+    <div class="skill-chip" onclick="quickSkill('summarize')">summarize</div>
+    <div class="skill-chip" onclick="quickSkill('notes')">notes</div>
+  </div>
+
+  <div class="input-area">
+    <div class="btn-icon voice" id="voiceBtn" onclick="toggleVoice()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/>
+      </svg>
+    </div>
+    <div class="input-wrap">
+      <textarea id="msgInput" placeholder="ask pia anything..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    </div>
+    <div class="btn-icon" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-header">
+    <div class="settings-title">settings</div>
+    <button class="btn-close" onclick="closeSettings()">×</button>
+  </div>
+  <div class="settings-body">
+
+    <div>
+      <div class="settings-section-label">ai engine</div>
+      <div class="engine-option selected" id="eng-claude" onclick="selectEngine('claude')">
+        <div><div class="engine-option-name">claude</div><div class="engine-option-sub">anthropic · sonnet 4</div></div>
+        <div class="radio-circle"><div class="radio-fill"></div></div>
+      </div>
+      <div class="engine-option" id="eng-gpt4o" onclick="selectEngine('gpt4o')">
+        <div><div class="engine-option-name">gpt-4o</div><div class="engine-option-sub">openai · latest</div></div>
+        <div class="radio-circle"><div class="radio-fill"></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="settings-section-label">api keys</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="api-input-wrap">
+          <label class="api-label">anthropic api key</label>
+          <input class="api-input" type="password" id="key-anthropic" placeholder="sk-ant-..." oninput="saveKeys()">
+        </div>
+        <div class="api-input-wrap">
+          <label class="api-label">openai api key</label>
+          <input class="api-input" type="password" id="key-openai" placeholder="sk-..." oninput="saveKeys()">
+        </div>
+        <div class="api-input-wrap">
+          <label class="api-label">elevenlabs api key (voice)</label>
+          <input class="api-input" type="password" id="key-eleven" placeholder="optional" oninput="saveKeys()">
+        </div>
+        <div class="save-notice" id="saveNotice">saved</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="settings-section-label">skills</div>
+      <div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">weather</div><div class="toggle-sub">live conditions & forecast</div></div>
+          <div class="toggle on" data-skill="weather" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">reminders</div><div class="toggle-sub">set & manage reminders</div></div>
+          <div class="toggle on" data-skill="reminders" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">web search</div><div class="toggle-sub">search the internet</div></div>
+          <div class="toggle on" data-skill="web_search" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">summarizer</div><div class="toggle-sub">summarize text & pages</div></div>
+          <div class="toggle on" data-skill="summarizer" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">notes</div><div class="toggle-sub">save & recall notes</div></div>
+          <div class="toggle on" data-skill="notes" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="skill-toggle">
+          <div class="toggle-info"><div class="toggle-name">calendar</div><div class="toggle-sub">check & add events</div></div>
+          <div class="toggle" data-skill="calendar" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="settings-section-label">voice</div>
+      <div class="skill-toggle">
+        <div class="toggle-info"><div class="toggle-name">speak replies</div><div class="toggle-sub">text-to-speech output</div></div>
+        <div class="toggle" data-skill="tts" id="tts-toggle" onclick="toggleSkill(this)"><div class="toggle-thumb"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const state = {
+  engine: 'claude', listening: false, thinking: false, tts: false,
+  skills: { weather: true, reminders: true, web_search: true, summarizer: true, notes: true, calendar: false },
+  conversation: [], reminders: [], notes: []
+};
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('pia_state') || '{}');
+    if (s.engine) state.engine = s.engine;
+    if (s.skills) state.skills = { ...state.skills, ...s.skills };
+    if (s.conversation) state.conversation = s.conversation.slice(-40);
+    if (s.reminders) state.reminders = s.reminders;
+    if (s.notes) state.notes = s.notes;
+    if (s.tts != null) state.tts = s.tts;
+    const k = JSON.parse(localStorage.getItem('pia_keys') || '{}');
+    if (k.anthropic) document.getElementById('key-anthropic').value = k.anthropic;
+    if (k.openai) document.getElementById('key-openai').value = k.openai;
+    if (k.eleven) document.getElementById('key-eleven').value = k.eleven;
+    updateEngineUI(); updateSkillTogglesUI();
+  } catch(e) {}
+}
+
+function saveState() {
+  try {
+    localStorage.setItem('pia_state', JSON.stringify({
+      engine: state.engine, skills: state.skills, tts: state.tts,
+      conversation: state.conversation.slice(-40),
+      reminders: state.reminders, notes: state.notes
+    }));
+  } catch(e) {}
+}
+
+function saveKeys() {
+  try {
+    localStorage.setItem('pia_keys', JSON.stringify({
+      anthropic: document.getElementById('key-anthropic').value,
+      openai: document.getElementById('key-openai').value,
+      eleven: document.getElementById('key-eleven').value
+    }));
+    const n = document.getElementById('saveNotice');
+    n.classList.add('show');
+    setTimeout(() => n.classList.remove('show'), 1500);
+  } catch(e) {}
+}
+
+function getApiKey() {
+  try {
+    const k = JSON.parse(localStorage.getItem('pia_keys') || '{}');
+    return state.engine === 'claude' ? k.anthropic : k.openai;
+  } catch(e) { return ''; }
+}
+
+function updateEngineUI() {
+  document.getElementById('engine-label').textContent = state.engine === 'claude' ? 'claude' : 'gpt-4o';
+  ['claude','gpt4o'].forEach(e => document.getElementById('eng-'+e).classList.toggle('selected', e === state.engine));
+}
+
+function selectEngine(e) { state.engine = e; updateEngineUI(); saveState(); }
+
+function updateSkillTogglesUI() {
+  document.querySelectorAll('.toggle[data-skill]').forEach(el => {
+    const s = el.dataset.skill;
+    el.classList.toggle('on', s === 'tts' ? state.tts : !!state.skills[s]);
+  });
+}
+
+function toggleSkill(el) {
+  const s = el.dataset.skill;
+  if (s === 'tts') { state.tts = !state.tts; el.classList.toggle('on', state.tts); }
+  else { state.skills[s] = !state.skills[s]; el.classList.toggle('on', state.skills[s]); }
+  saveState();
+}
+
+function openSettings() { document.getElementById('settingsPanel').classList.add('open'); }
+function closeSettings() { document.getElementById('settingsPanel').classList.remove('open'); }
+
+function setStatus(type, text) {
+  document.getElementById('status-dot').className = 'status-dot' + (type ? ' '+type : '');
+  document.getElementById('status-text').textContent = text;
+}
+
+function addMessage(role, text, skill) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  let inner = skill ? `<div class="skill-tag">${skill}</div><br>` : '';
+  inner += text.replace(/\n/g, '<br>');
+  div.innerHTML = `<div class="msg-label">${role === 'user' ? 'you' : 'pia'}</div><div class="msg-bubble">${inner}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addTypingIndicator() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg pia'; div.id = 'typing';
+  div.innerHTML = `<div class="msg-label">pia</div><div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+function removeTypingIndicator() { const t = document.getElementById('typing'); if (t) t.remove(); }
+
+function detectSkill(text) {
+  const t = text.toLowerCase();
+  if (/weather|temperature|forecast|rain|sunny|cold|hot/.test(t)) return 'weather';
+  if (/remind|reminder|alarm/.test(t)) return 'reminders';
+  if (/search|look up|find|what is|who is|latest/.test(t)) return 'web_search';
+  if (/summar|tldr/.test(t)) return 'summarizer';
+  if (/note|save this|remember that/.test(t)) return 'notes';
+  return null;
+}
+
+function buildSystem() {
+  const active = Object.entries(state.skills).filter(([,v])=>v).map(([k])=>k).join(', ');
+  const remCtx = state.reminders.length ? `\nReminders: ${JSON.stringify(state.reminders)}` : '';
+  const noteCtx = state.notes.length ? `\nNotes: ${JSON.stringify(state.notes)}` : '';
+  return `You are Pia, a smart concise personal AI assistant. Voice-first and mobile-friendly — keep responses SHORT (1-3 sentences max unless detail is truly needed). No markdown, no bullet points. Talk naturally and warmly.\n\nActive skills: ${active}\nTime: ${new Date().toLocaleTimeString()}\nDate: ${new Date().toLocaleDateString('en-IE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}${remCtx}${noteCtx}`;
+}
+
+function getStoredKeys() {
+  try { return JSON.parse(localStorage.getItem('pia_keys') || '{}'); } catch(e) { return {}; }
+}
+
+async function callAI(text) {
+  const msgs = [...state.conversation, {role:'user',content:text}];
+  const keys = getStoredKeys();
+  const res = await fetch('/api/ai', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      engine: state.engine,
+      messages: msgs,
+      system: buildSystem(),
+      anthropicKey: keys.anthropic || '',
+      openaiKey: keys.openai || ''
+    })
+  });
+  const d = await res.json();
+  if (d.error) return `error: ${d.error}`;
+  if (state.engine === 'claude') return d.content?.[0]?.text || "no response.";
+  return d.choices?.[0]?.message?.content || "no response.";
+}
+
+function speak(text) {
+  if (!state.tts || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05; u.pitch = 1;
+  const voices = window.speechSynthesis.getVoices();
+  const pref = voices.find(v => /Samantha|Karen|Moira|Fiona/.test(v.name)) || voices.find(v => v.lang.startsWith('en') && v.localService);
+  if (pref) u.voice = pref;
+  window.speechSynthesis.speak(u);
+}
+
+async function sendMessage(textOverride) {
+  const input = document.getElementById('msgInput');
+  const text = (textOverride || input.value).trim();
+  if (!text || state.thinking) return;
+  if (!textOverride) { input.value = ''; autoResize(input); }
+  addMessage('user', text);
+  state.conversation.push({role:'user',content:text});
+  state.thinking = true;
+  setStatus('thinking', 'thinking...');
+  addTypingIndicator();
+  try {
+    const reply = await callAI(text);
+    removeTypingIndicator();
+    addMessage('pia', reply, detectSkill(text) || undefined);
+    state.conversation.push({role:'assistant',content:reply});
+    if (/remind/i.test(reply)) state.reminders.push({text,time:Date.now()});
+    if (/saved.*note/i.test(reply)) state.notes.push({text,time:Date.now()});
+    speak(reply); saveState();
+    setStatus('', 'ready');
+  } catch(e) {
+    removeTypingIndicator();
+    addMessage('pia', 'something went wrong. check your api key or connection.');
+    setStatus('', 'ready');
+  }
+  state.thinking = false;
+}
+
+function quickSkill(skill) {
+  const p = {weather:"what's the weather right now?",reminder:"set a reminder for ",search:"search for ",summarize:"summarize this: ",notes:"save a note: "};
+  const input = document.getElementById('msgInput');
+  input.value = p[skill] || ''; input.focus(); autoResize(input);
+  if (skill === 'weather') sendMessage(p[skill]);
+}
+
+let recognition = null;
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    addMessage('pia', 'voice input needs chrome or safari.'); return;
+  }
+  if (state.listening) { if (recognition) recognition.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'en-IE'; recognition.interimResults = false; recognition.maxAlternatives = 1;
+  state.listening = true;
+  document.getElementById('voiceBtn').classList.add('active');
+  setStatus('listening', 'listening...');
+  recognition.onresult = e => { const t = e.results[0][0].transcript; document.getElementById('msgInput').value = t; autoResize(document.getElementById('msgInput')); sendMessage(t); };
+  recognition.onerror = recognition.onend = () => {
+    document.getElementById('voiceBtn').classList.remove('active');
+    state.listening = false;
+    if (!state.thinking) setStatus('', 'ready');
+  };
+  recognition.start();
+}
+
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
+
+loadState();
+</script>
+</body>
+</html>
