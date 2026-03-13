@@ -482,15 +482,27 @@ async function callAI(text) {
   return d.choices?.[0]?.message?.content || "no response.";
 }
 
-function speak(text) {
-  if (!state.tts || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05; u.pitch = 1;
-  const voices = window.speechSynthesis.getVoices();
-  const pref = voices.find(v => /Samantha|Karen|Moira|Fiona/.test(v.name)) || voices.find(v => v.lang.startsWith('en') && v.localService);
-  if (pref) u.voice = pref;
-  window.speechSynthesis.speak(u);
+async function speak(text) {
+  if (!state.tts) return;
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tts', text })
+    });
+    if (!res.ok) throw new Error('tts failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.play();
+  } catch(e) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    window.speechSynthesis.speak(u);
+  }
 }
 
 async function sendMessage(textOverride) {
