@@ -19,7 +19,7 @@ export default async (req) => {
 
   // Claude
   if (engine === 'claude') {
-    const key = Netlify.env.get('ANTHROPIC_API_KEY');
+    const key = Netlify.env.get('calude_key');
     if (!key) return new Response(JSON.stringify({ error: 'No Anthropic key configured' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -32,7 +32,7 @@ export default async (req) => {
 
   // GPT-4o
   if (engine === 'gpt4o') {
-    const key = Netlify.env.get('OPENAI_API_KEY');
+    const key = Netlify.env.get('OpenAI_Key');
     if (!key) return new Response(JSON.stringify({ error: 'No OpenAI key configured' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
