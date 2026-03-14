@@ -1,389 +1,297 @@
 'use strict';
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let currentStep     = 0;
-let userName        = '';
-let nameGreeted     = false;
-let nameGreetTimer  = null;
+/* ── state ── */
+let currentStep = 0, userName = '', greetTimer = null;
+let selectedTone   = 'warm-but-direct';
+let selectedHumor  = 'dry, understated';
+let selectedLength = '2-4 sentences maximum';
 
-let selectedTone    = 'warm-but-direct';
-let selectedHumor   = 'dry, understated';
-let selectedLength  = '2–4 sentences maximum';
+/* ── voice ── */
+let mediaRecorder = null, recordedChunks = [], recordedBlob = null, isRecording = false;
+let recInt = null, recSecs = 0, micStream = null, analyser = null, waveInt = null;
+const BARS = 36;
 
-// Voice
-let mediaRecorder   = null;
-let recordedChunks  = [];
-let recordedBlob    = null;
-let isRecording     = false;
-let recTimerInt     = null;
-let recSeconds      = 0;
-let audioCtx        = null;
-let analyserNode    = null;
-let waveSource      = null;
-let waveInterval    = null;
-let micStream       = null;
-const BAR_COUNT     = 44;
+/* ── photo ── */
+let photoBlob = null, camStream = null, camActive = false;
 
-// Photo
-let capturedPhotoBlob = null;
-let cameraStream      = null;
-let cameraActive      = false;
-
-// ── Init ───────────────────────────────────────────────────────────────────────
+/* ─────────── init ─────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  // Build waveform bars
   const wf = document.getElementById('waveform');
-  for (let i = 0; i < BAR_COUNT; i++) {
+  for (let i = 0; i < BARS; i++) {
     const b = document.createElement('div');
     b.className = 'wbar';
     wf.appendChild(b);
   }
-
-  // Enable "Next" on step 1 when name is filled
-  document.getElementById('inp-name').addEventListener('input', e => {
-    document.getElementById('btn-1-next').disabled = !e.target.value.trim();
-  });
-
-  // PIA says welcome on load (subtle, non-blocking)
-  setTimeout(() => piaSay('Hi there! Let\'s set up your personal AI twin. This takes just 2 minutes.'), 800);
 });
 
-// ── Navigation ─────────────────────────────────────────────────────────────────
-function goTo(step) {
-  currentStep = step;
-  document.getElementById('steps-track').style.transform = `translateX(-${step * 100}vw)`;
+/* ─────────── navigation ─────────── */
+function goTo(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('s' + n).classList.add('active');
+  document.getElementById('prog-fill').style.width = (n / 5 * 100) + '%';
+  currentStep = n;
 
-  // Progress dots
-  for (let i = 0; i < 5; i++) {
-    const d = document.getElementById(`pdot-${i}`);
-    d.className = 'pdot' + (i < step ? ' done' : i === step ? ' active' : '');
+  if (n === 1) {
+    setTimeout(() => {
+      const el = document.getElementById('inp-name');
+      if (el) el.focus();
+    }, 350);
   }
-
-  // Step side-effects
-  if (step === 1) {
-    setTimeout(() => document.getElementById('inp-name').focus(), 500);
+  if (n === 3) {
+    const sn = document.getElementById('script-name');
+    if (sn) sn.textContent = userName || 'you';
   }
-  if (step === 3) {
-    document.getElementById('script-name').textContent = userName || 'you';
-  }
-  if (step === 4) {
-    document.getElementById('cam-initials').textContent = userName ? userName[0].toUpperCase() : '?';
-    // No auto-start — user taps "📷 Use camera" explicitly
-  }
+  window.scrollTo(0, 0);
 }
 
-// ── PIA speaks ─────────────────────────────────────────────────────────────────
-async function piaSay(text) {
-  try {
-    const res = await fetch('/api/speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const audio = new Audio(URL.createObjectURL(blob));
-    audio.play().catch(() => {});   // ignore autoplay block
-  } catch (_) {}
+/* ─────────── step 1: name ─────────── */
+function onNameType(value) {
+  const trimmed = value.trim();
+  const btn = document.getElementById('btn-1');
+  if (btn) btn.disabled = !trimmed;
+
+  clearTimeout(greetTimer);
+  if (trimmed.length < 2) return;
+  if (trimmed === userName) return;
+  userName = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  greetTimer = setTimeout(() => {
+    const b = document.getElementById('bubble-name');
+    if (!b) return;
+    b.textContent = 'Hi ' + userName + '! Great to meet you.';
+    b.classList.add('show');
+  }, 750);
 }
 
-// ── Step 1: Name ──────────────────────────────────────────────────────────────
-function onNameInput(value) {
-  userName = value.trim();
-  document.getElementById('btn-1-next').disabled = !userName;
-  clearTimeout(nameGreetTimer);
-
-  if (userName.length >= 2 && !nameGreeted) {
-    nameGreetTimer = setTimeout(async () => {
-      nameGreeted = true;
-      const el = document.getElementById('pia-name-says');
-      el.textContent = `👋 Nice to meet you, ${userName}!`;
-      el.classList.remove('hidden');
-      await piaSay(`Nice to meet you, ${userName}!`);
-    }, 900);
-  } else if (userName.length < 2) {
-    nameGreeted = false;
-    document.getElementById('pia-name-says').classList.add('hidden');
-  }
-}
-
-// ── Step 2: Style chips ────────────────────────────────────────────────────────
+/* ─────────── step 2: chips ─────────── */
 function pick(group, el, value) {
-  el.closest('.chip-group').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
+  el.closest('.chip-row').querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
   if (group === 'tone')   selectedTone   = value;
   if (group === 'humor')  selectedHumor  = value;
   if (group === 'length') selectedLength = value;
 }
 
-// ── Step 3: Voice recording ────────────────────────────────────────────────────
-async function toggleRecord() {
-  if (isRecording) {
-    stopRecording(true);  // stop & keep blob
-  } else {
-    await startRecording();
-  }
-}
-
-function getSupportedAudioMime() {
+/* ─────────── step 3: voice ─────────── */
+function bestMime() {
   const types = [
     'audio/webm;codecs=opus',
     'audio/webm',
     'audio/ogg;codecs=opus',
     'audio/mp4',
+    ''
   ];
   for (const t of types) {
-    try { if (MediaRecorder.isTypeSupported(t)) return t; } catch (_) {}
+    try { if (!t || MediaRecorder.isTypeSupported(t)) return t; } catch(e) { /**/ }
   }
-  return '';  // browser default
+  return '';
+}
+
+function toggleRecord() {
+  if (isRecording) stopRecording(true);
+  else startRecording();
 }
 
 async function startRecording() {
   try {
-    micStream      = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recordedChunks = [];
-    isRecording    = true;
-
-    const mime    = getSupportedAudioMime();
-    const mrOpts  = mime ? { mimeType: mime } : {};
-    mediaRecorder = new MediaRecorder(micStream, mrOpts);
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-      micStream.getTracks().forEach(t => t.stop());
-      micStream = null;
-      document.getElementById('rec-status').textContent = `✅ Recorded ${formatTime(recSeconds)}`;
-      document.getElementById('btn-3-next').disabled    = false;
-    };
-    mediaRecorder.start(100);
-
-    // UI
-    document.getElementById('btn-record').classList.add('recording');
-    document.getElementById('btn-record').textContent = '⏹';
-    document.getElementById('rec-status').textContent = 'Recording…';
-    document.getElementById('waveform').classList.add('active');
-
-    // Timer — auto-stop at 90 s
-    recSeconds = 0;
-    recTimerInt = setInterval(() => {
-      recSeconds++;
-      document.getElementById('rec-timer').textContent = formatTime(recSeconds);
-      if (recSeconds >= 90) stopRecording(true);
-    }, 1000);
-
-    // Web Audio analyser for real-time waveform
-    try {
-      audioCtx     = new AudioContext();
-      analyserNode = audioCtx.createAnalyser();
-      analyserNode.fftSize = 128;
-      waveSource   = audioCtx.createMediaStreamSource(micStream);
-      waveSource.connect(analyserNode);
-      waveInterval = setInterval(() => animateWave(true), 80);
-    } catch (_) {
-      waveInterval = setInterval(() => animateWave(false), 120);
-    }
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
-    console.warn('[voice] mic access denied:', err);
-    const msg = err.name === 'NotAllowedError'
-      ? '⚠ Mic blocked — allow access or skip'
-      : `⚠ Mic error: ${err.message}`;
-    document.getElementById('rec-status').textContent = msg;
-    // Auto-enable Next so user isn't stuck
-    document.getElementById('btn-3-next').disabled = false;
+    const st = document.getElementById('rec-status');
+    if (st) st.textContent = 'Mic blocked \u2014 check browser settings';
+    return;
   }
-}
 
-function stopRecording(keepBlob = false) {
-  if (!isRecording) return;
-  isRecording = false;
-  clearInterval(recTimerInt);
-  clearInterval(waveInterval);
-  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-  document.getElementById('btn-record').classList.remove('recording');
-  document.getElementById('btn-record').textContent = '🎙';
-  document.getElementById('waveform').classList.remove('active');
-  document.querySelectorAll('.wbar').forEach(b => b.style.height = '6px');
-  if (!keepBlob) recordedBlob = null;
-}
+  recordedChunks = [];
+  const mime = bestMime();
+  const opts = mime ? { mimeType: mime } : {};
+  try { mediaRecorder = new MediaRecorder(micStream, opts); } catch(e) { mediaRecorder = new MediaRecorder(micStream); }
 
-function stopAndNext() {
-  stopRecording(true);
-  goTo(4);
-}
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const mtype = mediaRecorder.mimeType || 'audio/webm';
+    if (recordedChunks.length) recordedBlob = new Blob(recordedChunks, { type: mtype });
+  };
+  mediaRecorder.start(250);
+  isRecording = true;
 
-function skipAndNext(n) {
-  stopRecording(false);
-  goTo(n);
-}
+  const btn = document.getElementById('btn-rec');
+  const st  = document.getElementById('rec-status');
+  if (btn) { btn.classList.add('on'); btn.textContent = '\u23f9'; }
+  if (st)  st.textContent = 'Recording\u2026';
 
-function animateWave(useAnalyser) {
-  const bars = document.querySelectorAll('.wbar');
-  if (useAnalyser && analyserNode) {
-    const data = new Uint8Array(analyserNode.frequencyBinCount);
-    analyserNode.getByteFrequencyData(data);
-    const step = Math.max(1, Math.floor(data.length / BAR_COUNT));
-    bars.forEach((bar, i) => {
-      const raw = data[i * step] || 0;
-      bar.style.height = Math.max(6, raw * 0.42) + 'px';
-    });
-  } else {
-    bars.forEach(bar => {
-      bar.style.height = (6 + Math.random() * 44) + 'px';
-    });
-  }
-}
+  recSecs = 0;
+  recInt = setInterval(() => {
+    recSecs++;
+    const t = document.getElementById('rec-timer');
+    if (t) t.textContent = Math.floor(recSecs / 60) + ':' + String(recSecs % 60).padStart(2, '0');
+    if (recSecs >= 90) stopRecording(true);
+  }, 1000);
 
-function formatTime(s) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
-
-// ── Step 4: Camera / Photo ─────────────────────────────────────────────────────
-async function startCamera() {
-  if (cameraActive) return;
-  const hint = document.getElementById('cam-hint');
-  hint.textContent = 'Starting camera…';
+  /* waveform via WebAudio */
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
-      audio: false,
-    });
-    const video = document.getElementById('cam-video');
-    video.srcObject = cameraStream;
-    video.style.display = 'block';
-    document.getElementById('cam-initials').style.display = 'none';
-    hint.textContent = 'Tap the circle to take your photo';
-    cameraActive = true;
-  } catch (err) {
-    console.warn('[camera] not available:', err);
-    const msg = err.name === 'NotAllowedError'
-      ? '⚠ Camera blocked — allow access in browser settings, or upload a photo'
-      : '⚠ No camera found — upload a photo below';
-    hint.textContent = msg;
-    document.getElementById('cam-initials').style.display = '';
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(micStream);
+    analyser  = ctx.createAnalyser();
+    analyser.fftSize = 128;
+    src.connect(analyser);
+    const wf  = document.getElementById('waveform');
+    if (wf) wf.classList.add('live');
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    waveInt = setInterval(() => {
+      analyser.getByteTimeDomainData(data);
+      const bars = document.querySelectorAll('.wbar');
+      bars.forEach((bar, i) => {
+        const v = (data[Math.floor(i * data.length / BARS)] - 128) / 128;
+        bar.style.height = Math.max(4, Math.abs(v) * 38) + 'px';
+      });
+    }, 70);
+  } catch(e) { /* no waveform on unsupported browsers */ }
+}
+
+function stopRecording(keep) {
+  clearInterval(recInt);
+  clearInterval(waveInt);
+  waveInt = null;
+  if (mediaRecorder && isRecording) {
+    try { mediaRecorder.stop(); } catch(e) { /**/ }
   }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  isRecording = false;
+  if (!keep) recordedBlob = null;
+
+  const btn = document.getElementById('btn-rec');
+  const st  = document.getElementById('rec-status');
+  const wf  = document.getElementById('waveform');
+  if (btn) { btn.classList.remove('on'); btn.textContent = '\uD83C\uDF9D'; }
+  if (st)  st.textContent = keep && recordedBlob ? 'Voice saved \u2713' : 'Tap to record';
+  if (wf)  { wf.classList.remove('live'); wf.querySelectorAll('.wbar').forEach(b => b.style.height = '4px'); }
 }
 
-function handleCircleTap() {
-  if (cameraActive) capturePhoto();
+function finishVoice() { stopRecording(true); goTo(4); }
+function skipVoice()   { stopRecording(false); goTo(4); }
+
+/* ─────────── step 4: photo ─────────── */
+async function openCamera() {
+  if (camActive) return;
+  const hint = document.getElementById('cam-hint');
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } }
+    });
+  } catch(err) {
+    if (hint) hint.textContent = 'Camera blocked \u2014 use Upload instead.';
+    return;
+  }
+  camActive = true;
+  const vid = document.getElementById('cam-video');
+  const ico = document.getElementById('cam-icon');
+  if (vid) { vid.srcObject = camStream; vid.style.display = 'block'; }
+  if (ico) ico.style.display = 'none';
+  if (hint) hint.textContent = 'Tap the circle to take a photo';
 }
 
-function capturePhoto() {
-  const video  = document.getElementById('cam-video');
+function camTap() {
+  if (!camActive) { openCamera(); return; }
+  const vid    = document.getElementById('cam-video');
   const canvas = document.getElementById('cam-canvas');
   const snap   = document.getElementById('cam-snap');
+  const hint   = document.getElementById('cam-hint');
+  if (!vid || !canvas || !snap) return;
 
-  canvas.width  = 400;
-  canvas.height = 400;
+  const size = 480;
+  canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // Mirror the selfie camera
-  ctx.translate(400, 0);
-  ctx.scale(-1, 1);
-  ctx.drawImage(video, 0, 0, 400, 400);
+  ctx.save();
+  ctx.translate(size, 0); ctx.scale(-1, 1);
+  ctx.drawImage(vid, 0, 0, size, size);
+  ctx.restore();
 
   canvas.toBlob(blob => {
-    capturedPhotoBlob = blob;
-    snap.src = URL.createObjectURL(blob);
-    snap.style.display  = 'block';
-    video.style.display = 'none';
-    document.getElementById('cam-initials').style.display = 'none';
-    document.getElementById('cam-hint').textContent = '✅ Photo saved — tap again to retake';
-    // Stop camera
-    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
-    cameraStream = null;
-    cameraActive = false;
-  }, 'image/jpeg', 0.9);
+    if (!blob) return;
+    photoBlob = blob;
+    const url = URL.createObjectURL(blob);
+    snap.src = url;
+    snap.style.display = 'block';
+    if (vid) vid.style.display = 'none';
+    if (hint) hint.textContent = 'Looking good! Tap Upload to change it.';
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; camActive = false; }
+  }, 'image/jpeg', 0.88);
 }
 
-function handleUpload(event) {
-  const file = event.target.files[0];
+function fileChosen(e) {
+  const file = e.target.files && e.target.files[0];
   if (!file) return;
-  capturedPhotoBlob = file;
+  photoBlob = file;
+  const url = URL.createObjectURL(file);
   const snap = document.getElementById('cam-snap');
-  snap.src = URL.createObjectURL(file);
-  snap.style.display = 'block';
-  document.getElementById('cam-video').style.display    = 'none';
-  document.getElementById('cam-initials').style.display = 'none';
-  document.getElementById('cam-hint').textContent = '✅ Photo ready';
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-  cameraActive = false;
+  const ico  = document.getElementById('cam-icon');
+  const hint = document.getElementById('cam-hint');
+  if (snap) { snap.src = url; snap.style.display = 'block'; }
+  if (ico)  ico.style.display = 'none';
+  if (hint) hint.textContent = 'Photo selected \u2713';
 }
 
-// ── Finish onboarding — save then show ready ────────────────────────────────────
-async function finishOnboarding() {
-  // Stop any ongoing recording
+/* ─────────── step 5: finish ─────────── */
+async function finishSetup() {
   stopRecording(true);
-  // Stop camera
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-
-  // Go straight to step 5 (spinner) — do NOT call goTo(4) which re-starts camera
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   goTo(5);
 
+  const tagEl  = document.getElementById('inp-tagline');
+  const tagline = tagEl ? tagEl.value.trim() : '';
+
   try {
-    // 1. Save profile
     await fetch('/api/onboard/profile', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name:            userName,
-        tagline:         document.getElementById('inp-tagline').value.trim(),
-        tone:            selectedTone,
-        humor:           selectedHumor,
-        response_length: selectedLength,
-      }),
+        name: userName, tagline,
+        tone: selectedTone, humor: selectedHumor, length: selectedLength
+      })
     });
+  } catch(e) { /* offline \u2014 continue */ }
 
-    // 2. Upload voice sample
-    if (recordedBlob) {
-      const fd = new FormData();
-      fd.append('file', recordedBlob, 'voice_sample.webm');
-      await fetch('/api/onboard/voice-sample', { method: 'POST', body: fd });
-    }
-
-    // 3. Upload photo
-    if (capturedPhotoBlob) {
-      const fd = new FormData();
-      fd.append('file', capturedPhotoBlob, 'avatar.jpg');
-      await fetch('/api/onboard/photo', { method: 'POST', body: fd });
-    }
-  } catch (err) {
-    console.error('[onboard] save error:', err);
-    // Continue anyway — don't block the user
+  if (recordedBlob) {
+    try {
+      const ext  = recordedBlob.type.includes('ogg') ? 'ogg' : recordedBlob.type.includes('mp4') ? 'm4a' : 'webm';
+      const form = new FormData();
+      form.append('file', recordedBlob, 'voice.' + ext);
+      await fetch('/api/onboard/voice-sample', { method: 'POST', body: form });
+    } catch(e) { /* ignore */ }
   }
 
-  // Mark onboarded in localStorage
-  localStorage.setItem('pia_onboarded', '1');
-  localStorage.setItem('pia_user_name', userName);
+  if (photoBlob) {
+    try {
+      const ext  = photoBlob.type === 'image/png' ? 'png' : 'jpg';
+      const form = new FormData();
+      form.append('file', photoBlob, 'photo.' + ext);
+      await fetch('/api/onboard/photo', { method: 'POST', body: form });
+    } catch(e) { /* ignore */ }
+  }
 
-  // Build ready screen
-  buildReadyScreen();
+  localStorage.setItem('pia_onboarded', '1');
+  showReady();
 }
 
-function buildReadyScreen() {
-  // Swap spinner → ready block
-  document.getElementById('saving-block').style.display = 'none';
-  const readyBlock = document.getElementById('ready-block');
-  readyBlock.style.display = 'flex';
+function showReady() {
+  const savEl   = document.getElementById('saving-view');
+  const readyEl = document.getElementById('ready-view');
+  const av      = document.getElementById('ready-av');
+  const img     = document.getElementById('ready-img');
+  const init    = document.getElementById('ready-init');
+  const h1      = document.getElementById('ready-h1');
 
-  // Show photo or initials
-  document.getElementById('ready-initials').textContent = (userName || '?')[0].toUpperCase();
-  document.getElementById('ready-title').textContent = `${userName || 'You'}, your twin is ready.`;
+  if (savEl) savEl.style.display = 'none';
+  if (readyEl) { readyEl.style.display = 'flex'; }
 
-  if (capturedPhotoBlob) {
-    const img = document.getElementById('ready-photo');
-    img.src = URL.createObjectURL(capturedPhotoBlob);
+  const name = userName || 'there';
+  if (h1)   h1.textContent = name + ', your twin is ready.';
+  if (init) init.textContent = name.charAt(0).toUpperCase();
+
+  if (photoBlob && img) {
+    img.src = URL.createObjectURL(photoBlob);
     img.style.display = 'block';
-    document.getElementById('ready-initials').style.display = 'none';
+    if (init) init.style.display = 'none';
   }
-
-  // PIA speaks the welcome — this is the "amazed" moment
-  setTimeout(() => {
-    piaSay(
-      `Hi ${userName || 'there'}! I'm PIA — your personal AI twin. ` +
-      `I'm ready to take calls on your behalf and respond exactly how you would. ` +
-      `Let's do this.`
-    );
-  }, 700);
 }
 
 function startFirstCall() {
