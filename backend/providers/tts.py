@@ -4,7 +4,21 @@ Returns raw MP3 audio bytes for a given text string.
 """
 
 import os
+import re
 import httpx
+
+
+def _clean_for_tts(text: str) -> str:
+    """
+    Pre-process text before sending to TTS so it reads naturally.
+    - 'PIA' as standalone word → 'Pia'  (avoids letter-by-letter reading)
+    - Strip markdown bold/italic markers
+    """
+    # Replace all-caps 'PIA' (as a word) with 'Pia'
+    text = re.sub(r'\bPIA\b', 'Pia', text)
+    # Strip common markdown that slips through
+    text = re.sub(r'[*_`#]', '', text)
+    return text.strip()
 
 
 async def synthesize_speech(
@@ -24,6 +38,7 @@ async def synthesize_speech(
     Returns:
         MP3 audio bytes
     """
+    text = _clean_for_tts(text)
     try:
         return await _call_elevenlabs(text, voice_id, settings_override)
     except Exception as el_err:
@@ -45,15 +60,15 @@ async def _call_elevenlabs(
     voice_id = voice_id or os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
     defaults = {
-        "stability":         0.5,
-        "similarity_boost":  0.75,
-        "style":             0.2,
+        "stability":         0.33,   # lower = more expressive/varied
+        "similarity_boost":  0.88,   # higher = truer to the cloned voice
+        "style":             0.45,   # more character/emotion
         "use_speaker_boost": True,
     }
     if settings_override:
         defaults.update({k: v for k, v in settings_override.items() if k in defaults})
 
-    model_id = (settings_override or {}).get("model", "eleven_turbo_v2")
+    model_id = (settings_override or {}).get("model", "eleven_turbo_v2_5")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
@@ -91,9 +106,9 @@ async def _call_openai_tts(text: str) -> bytes:
                 "Content-Type":  "application/json",
             },
             json={
-                "model": "tts-1",
+                "model": "tts-1-hd",   # hd = higher quality, less robotic
                 "input": text,
-                "voice": "echo",   # echo sounds confident/professional; options: alloy echo fable onyx nova shimmer
+                "voice": "onyx",       # onyx: warm, deep, natural; options: alloy echo fable onyx nova shimmer
             },
         )
 

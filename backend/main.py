@@ -111,9 +111,9 @@ async def save_onboard_profile(data: OnboardProfile):
     # Patch with onboarding data
     existing["onboarded"]    = True
     existing["display_name"] = data.name
-    existing["twin_name"]    = "PIA"
+    existing["twin_name"]    = "Pia"
     existing["last_updated"] = datetime.now().strftime("%Y-%m-%d")
-    existing["greeting"]     = f"Hey! You've reached PIA \u2014 {data.name}'s twin. What's on your mind?"
+    existing["greeting"]     = f"Hey, I'm Pia \u2014 {data.name}'s AI twin. You can call me Pia, or rename me to whatever you'd like in settings. How's your day going? Anything on your mind?"
 
     if "identity" not in existing:
         existing["identity"] = {}
@@ -200,7 +200,7 @@ async def avatar_config():
 
 @app.post("/api/call/start", response_model=StartCallResponse)
 async def start_call():
-    """Begin a new call session. Returns session ID and PIA's opening line."""
+    """Begin a new call session. Returns session ID and Pia's opening line."""
     # Re-read profile on each call so persona edits are reflected immediately
     profile  = load_user_profile(DEFAULT_USER_ID)
     persona  = profile.persona
@@ -209,7 +209,40 @@ async def start_call():
     session = CallSession(session_id=session_id, persona=persona)
     sessions[session_id] = session
 
-    greeting = persona.get("greeting", "Hey! PIA here. What's on your mind?")
+    # Generate a fresh, natural greeting via LLM so it varies and sounds human
+    try:
+        hour = datetime.now().hour
+        if hour < 12:    time_of_day = "morning"
+        elif hour < 17:  time_of_day = "afternoon"
+        else:            time_of_day = "evening"
+
+        name = persona.get("display_name", "")
+        base_prompt = build_system_prompt(persona)
+        greeting_prompt = (
+            base_prompt
+            + f"\n\nGREETING MODE: This is the very first thing you say on a call. "
+            + "Your name is Pia — always say it as one word like a name, never spell it out as letters. "
+            + f"It\'s {time_of_day}. "
+            + "Do ALL of the following in 3–4 natural spoken sentences:\n"
+            + "1. Introduce yourself as Pia, the AI twin.\n"
+            + "2. Casually mention they can rename you to anything they want in settings.\n"
+            + "3. Open a warm, genuine conversation — ask how their day\'s going, what\'s on their mind, "
+            + "comment on the time of day or make a light casual remark about the weather or plans for the day.\n"
+            + "Sound like a real person, not an assistant. No filler words like \'certainly\' or \'absolutely\'. No lists."
+        )
+        greeting = await generate_response(
+            user_message="[call started]",
+            persona=persona,
+            memory=MemoryManager(),
+            system_prompt_override=greeting_prompt,
+        )
+    except Exception as e:
+        print(f"[start_call] LLM greeting failed ({e}) — using fallback")
+        greeting = persona.get(
+            "greeting",
+            "Hey, I'm Pia — your AI twin. You can rename me whatever you like in settings. How's your day going?",
+        )
+
     return StartCallResponse(
         session_id=session_id,
         greeting=greeting,

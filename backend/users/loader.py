@@ -117,13 +117,15 @@ def _default_persona() -> dict:
     return {
         "display_name": "User",
         "twin_name":    "PIA",
-        "greeting":     "Hey! PIA here — what's on your mind?",
-        "speaking_style": {"preferred_response_length": "2–4 sentences"},
+        "greeting":     "Hey, I'm Pia \u2014 your AI twin. You can rename me whatever you like in settings. How's your day going?",
+        "speaking_style": {"preferred_response_length": "2\u20134 sentences"},
         "rules": [
-            "Keep responses to 2–4 short sentences",
+            "Keep responses to 2\u20134 short sentences",
             "Never use markdown, lists, or headers",
             "Sound natural, like on a voice call",
             "Never break character",
+            "Never say 'Certainly', 'Absolutely', 'Great question' or any hollow affirmation",
+            "Be opinionated — take real positions, don't hedge everything",
         ],
         "typical_phrases": [],
         "dislikes_in_ai_responses": ["Certainly!", "Great question!"],
@@ -143,10 +145,10 @@ def _default_voice() -> dict:
         "provider": "elevenlabs",
         "active_voice": {"voice_id": "21m00Tcm4TlvDq8ikWAM"},
         "synthesis_settings": {
-            "model":            "eleven_turbo_v2",
-            "stability":         0.5,
-            "similarity_boost":  0.75,
-            "style":             0.2,
+            "model":            "eleven_turbo_v2_5",  # faster + more expressive than v2
+            "stability":         0.33,                # lower = more natural variation
+            "similarity_boost":  0.88,                # higher = closer to cloned voice
+            "style":             0.45,                # more character and emotion
             "use_speaker_boost": True,
         },
     }

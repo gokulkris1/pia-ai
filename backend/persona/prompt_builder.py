@@ -117,7 +117,12 @@ def build_system_prompt(persona: dict[str, Any], mode: str = "call") -> str:
         parts.append(
             "\nMODE: Voice call. "
             "Respond in 2–4 short spoken sentences maximum. "
-            "No markdown. No lists. No headers. Sound like a real person on a call."
+            "No markdown. No lists. No headers. Sound like a real person on a call. "
+            "Be direct and opinionated — take a position, don't hedge. "
+            "Never say 'Certainly', 'Absolutely', 'Great question', or any hollow filler. "
+            "If you don't know something, say so plainly. "
+            "React like a human would — with genuine curiosity, dry wit, or a real take. "
+            "Never start a sentence with 'I' as the very first word of your reply."
         )
 
     return "\n\n".join(p for p in parts if p.strip())
