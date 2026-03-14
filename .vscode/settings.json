@@ -1,0 +1,9 @@
+{
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "push",
+  "git.inputValidationLength": 100,
+  "editor.formatOnSave": true,
+  "files.autoSave": "onWindowChange"
+}
