@@ -68,8 +68,7 @@ function goTo(step) {
   }
   if (step === 4) {
     document.getElementById('cam-initials').textContent = userName ? userName[0].toUpperCase() : '?';
-    // Auto-start camera
-    setTimeout(startCamera, 400);
+    // No auto-start — user taps "📷 Use camera" explicitly
   }
 }
 
@@ -126,13 +125,28 @@ async function toggleRecord() {
   }
 }
 
+function getSupportedAudioMime() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  for (const t of types) {
+    try { if (MediaRecorder.isTypeSupported(t)) return t; } catch (_) {}
+  }
+  return '';  // browser default
+}
+
 async function startRecording() {
   try {
     micStream      = await navigator.mediaDevices.getUserMedia({ audio: true });
     recordedChunks = [];
     isRecording    = true;
 
-    mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm;codecs=opus' });
+    const mime    = getSupportedAudioMime();
+    const mrOpts  = mime ? { mimeType: mime } : {};
+    mediaRecorder = new MediaRecorder(micStream, mrOpts);
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
@@ -170,7 +184,12 @@ async function startRecording() {
     }
   } catch (err) {
     console.warn('[voice] mic access denied:', err);
-    document.getElementById('rec-status').textContent = '⚠ Microphone access denied';
+    const msg = err.name === 'NotAllowedError'
+      ? '⚠ Mic blocked — allow access or skip'
+      : `⚠ Mic error: ${err.message}`;
+    document.getElementById('rec-status').textContent = msg;
+    // Auto-enable Next so user isn't stuck
+    document.getElementById('btn-3-next').disabled = false;
   }
 }
 
@@ -222,17 +241,26 @@ function formatTime(s) {
 // ── Step 4: Camera / Photo ─────────────────────────────────────────────────────
 async function startCamera() {
   if (cameraActive) return;
+  const hint = document.getElementById('cam-hint');
+  hint.textContent = 'Starting camera…';
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+      audio: false,
+    });
     const video = document.getElementById('cam-video');
     video.srcObject = cameraStream;
     video.style.display = 'block';
     document.getElementById('cam-initials').style.display = 'none';
-    document.getElementById('cam-hint').textContent = 'Tap the circle to take your photo';
+    hint.textContent = 'Tap the circle to take your photo';
     cameraActive = true;
   } catch (err) {
     console.warn('[camera] not available:', err);
-    document.getElementById('cam-hint').textContent = 'Camera unavailable — upload a photo instead';
+    const msg = err.name === 'NotAllowedError'
+      ? '⚠ Camera blocked — allow access in browser settings, or upload a photo'
+      : '⚠ No camera found — upload a photo below';
+    hint.textContent = msg;
+    document.getElementById('cam-initials').style.display = '';
   }
 }
 
@@ -288,10 +316,7 @@ async function finishOnboarding() {
   // Stop camera
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
 
-  goTo(4);  // ensure we're on step 4 visually first (already there)
-
-  // Navigate to step 5 — show spinner
-  currentStep = 4;
+  // Go straight to step 5 (spinner) — do NOT call goTo(4) which re-starts camera
   goTo(5);
 
   try {

@@ -19,7 +19,8 @@
 
     html, body { height: 100%; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      overflow: hidden; -webkit-tap-highlight-color: transparent; }
+      -webkit-tap-highlight-color: transparent; }
+    /* No overflow:hidden on body — allow virtual keyboard to push layout */
 
     /* ── Progress dots ──────────────────────────────────────────────────────── */
     .progress {
@@ -41,8 +42,13 @@
     }
     .step {
       width: 100vw; height: 100%; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 80px 28px 52px; gap: 0; overflow-y: auto;
+      align-items: center; justify-content: flex-start;
+      padding: 80px 28px 60px; gap: 0; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* Center content on tall screens where it won't reach the bottom */
+    @media (min-height: 700px) {
+      .step { justify-content: center; }
     }
 
     /* ── PIA ring (step 0) ──────────────────────────────────────────────────── */
