@@ -131,6 +131,12 @@
   <!-- Scripts -->
   <script src="/static/avatar.js"></script>
   <script src="/static/app.js"></script>
+  <script>
+    // Gate: redirect to onboarding wizard on first visit
+    if (!localStorage.getItem('pia_onboarded')) {
+      window.location.replace('/onboard');
+    }
+  </script>
 
 </body>
 </html>

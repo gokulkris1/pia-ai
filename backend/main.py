@@ -6,6 +6,8 @@ Run: uvicorn main:app --reload --port 8000
 
 import os
 import uuid
+import json
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -17,6 +19,11 @@ from dotenv import load_dotenv
 
 # Load .env from project root
 load_dotenv(Path(__file__).parent.parent / ".env")
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+BACKEND_DIR  = Path(__file__).parent
+PROJECT_ROOT = BACKEND_DIR.parent
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 from providers.stt import transcribe_audio
 from providers.llm import generate_response
@@ -67,6 +74,101 @@ class StartCallResponse(BaseModel):
     session_id: str
     greeting: str
     persona_name: str
+
+class OnboardProfile(BaseModel):
+    name: str
+    tagline: str = ""
+    tone: str = "warm-but-direct"
+    humor: str = "dry, understated"
+    response_length: str = "2-4 sentences maximum"
+
+
+# ── Onboarding routes ────────────────────────────────────────────────────────
+
+@app.get("/api/onboard/status")
+async def onboard_status():
+    """Check if the user has completed onboarding."""
+    persona_path = PROJECT_ROOT / "users" / DEFAULT_USER_ID / "persona.json"
+    if persona_path.exists():
+        data = json.loads(persona_path.read_text())
+        return {"onboarded": data.get("onboarded", False), "name": data.get("display_name", "")}
+    return {"onboarded": False, "name": ""}
+
+
+@app.post("/api/onboard/profile")
+async def save_onboard_profile(data: OnboardProfile):
+    """Write user profile from onboarding wizard to persona.json."""
+    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
+    user_dir.mkdir(parents=True, exist_ok=True)
+    persona_path = user_dir / "persona.json"
+
+    # Load existing as base (keep all the AI rules/defaults)
+    existing = {}
+    if persona_path.exists():
+        existing = json.loads(persona_path.read_text())
+
+    # Patch with onboarding data
+    existing["onboarded"]    = True
+    existing["display_name"] = data.name
+    existing["twin_name"]    = "PIA"
+    existing["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+    existing["greeting"]     = f"Hey! You've reached PIA \u2014 {data.name}'s twin. What's on your mind?"
+
+    if "identity" not in existing:
+        existing["identity"] = {}
+    existing["identity"]["background"] = data.tagline
+
+    if "speaking_style" not in existing:
+        existing["speaking_style"] = {}
+    existing["speaking_style"]["tone"]                      = data.tone
+    existing["speaking_style"]["preferred_response_length"] = data.response_length
+
+    if "humor" not in existing:
+        existing["humor"] = {}
+    existing["humor"]["style"] = data.humor
+
+    persona_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
+
+    # Hot-reload global profile so next call uses new persona immediately
+    global USER_PROFILE, PERSONA
+    USER_PROFILE = load_user_profile(DEFAULT_USER_ID)
+    PERSONA      = USER_PROFILE.persona
+
+    print(f"[onboard] Profile saved for '{data.name}'")
+    return {"status": "saved", "name": data.name}
+
+
+@app.post("/api/onboard/voice-sample")
+async def save_voice_sample(file: UploadFile = File(...)):
+    """Store the user's voice recording for future ElevenLabs cloning."""
+    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
+    user_dir.mkdir(parents=True, exist_ok=True)
+    out_path = user_dir / "voice_sample.webm"
+    content  = await file.read()
+    out_path.write_bytes(content)
+    print(f"[onboard] Voice sample saved ({len(content):,} bytes)")
+    return {"status": "saved", "bytes": len(content)}
+
+
+@app.post("/api/onboard/photo")
+async def save_onboard_photo(file: UploadFile = File(...)):
+    """Save user photo as frontend avatar (served as /static/avatar.jpg)."""
+    content = await file.read()
+    # Serve from frontend/ so it's picked up by StaticFiles
+    avatar_path = FRONTEND_DIR / "avatar.jpg"
+    avatar_path.write_bytes(content)
+    # Also keep a backup in the user folder
+    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
+    user_dir.mkdir(parents=True, exist_ok=True)
+    (user_dir / "avatar_original.jpg").write_bytes(content)
+    print(f"[onboard] Photo saved ({len(content):,} bytes)")
+    return {"status": "saved"}
+
+
+@app.get("/onboard")
+async def serve_onboard():
+    """Serve the onboarding wizard page."""
+    return FileResponse(str(FRONTEND_DIR / "onboard.html"))
 
 
 # ── API routes ────────────────────────────────────────────────────────────────
@@ -189,8 +291,6 @@ async def speak(req: SpeakRequest):
 
 
 # ── Serve frontend ────────────────────────────────────────────────────────────
-
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
