@@ -2,22 +2,27 @@
   publish = "frontend"
   command = ""
 
-# API calls are proxied to the FastAPI backend on Render.
-# Set BACKEND_URL in Netlify → Site settings → Environment variables.
-# Value should be your Render service URL, e.g. https://pia-backend.onrender.com
+# /static/* on FastAPI becomes /* on Netlify (files live at root of frontend/)
+[[redirects]]
+  from = "/static/:file"
+  to = "/:file"
+  status = 200
+  force = false
+
+# API calls proxied to Render backend
 [[redirects]]
   from = "/api/*"
   to = "https://pia-ai-gpzy.onrender.com/api/:splat"
   status = 200
   force = true
 
+# Onboard page served from Netlify directly (frontend/onboard.html)
 [[redirects]]
   from = "/onboard"
-  to = "https://pia-ai-gpzy.onrender.com/onboard"
+  to = "/onboard.html"
   status = 200
-  force = true
 
-# SPA fallback — serve index.html for all other routes
+# SPA fallback — must be last
 [[redirects]]
   from = "/*"
   to = "/index.html"
