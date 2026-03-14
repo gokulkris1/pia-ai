@@ -11,103 +11,129 @@
 
   <!-- ── Idle / Pre-call screen ───────────────────────────────────────────── -->
   <div id="screen-idle" class="screen active">
+    <!-- blurred background clone of the avatar photo -->
+    <div class="idle-bg">
+      <img src="/static/avatar.jpg" alt="" aria-hidden="true"
+           onerror="this.parentElement.classList.add('no-photo')" />
+    </div>
+    <div class="idle-overlay"></div>
+
     <div class="idle-content">
       <div class="idle-avatar">
         <img id="idle-photo" src="/static/avatar.jpg" alt="PIA"
              onerror="this.src=''; this.parentElement.classList.add('no-photo')" />
         <div class="idle-avatar-initials">PIA</div>
       </div>
-      <h1 class="idle-name">PIA</h1>
-      <p class="idle-subtitle">Your Personal AI Twin</p>
-      <button id="btn-call" class="btn-call" onclick="startCall()">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
-          <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2
-                   1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1
-                   C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1
-                   0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
-        </svg>
-        Call PIA
-      </button>
-      <p class="idle-hint">Uses your microphone &amp; speakers</p>
-    </div>
-  </div>
+      <h1 class="idle-name" id="idle-name">PIA</h1>
+      <p class="idle-subtitle">Your personal AI twin • always on</p>
 
-  <!-- ── Active call screen ───────────────────────────────────────────────── -->
-  <div id="screen-call" class="screen">
-
-    <!-- Top bar: status + timer -->
-    <div class="call-topbar">
-      <div class="call-status-dot" id="status-dot"></div>
-      <span id="call-status-text">Connecting…</span>
-      <span class="call-timer" id="call-timer">00:00</span>
-    </div>
-
-    <!-- Avatar area -->
-    <div class="call-avatar-wrap">
-
-      <!-- Ripple rings (visible when PIA speaks) -->
-      <div class="ring ring-1"></div>
-      <div class="ring ring-2"></div>
-      <div class="ring ring-3"></div>
-
-      <!-- Avatar circle -->
-      <div class="call-avatar" id="call-avatar">
-        <img id="call-photo" src="/static/avatar.jpg" alt="PIA"
-             onerror="this.src=''; this.parentElement.classList.add('no-photo')" />
-        <div class="avatar-initials">PIA</div>
-
-        <!-- Mouth overlay — driven by audio amplitude -->
-        <div class="mouth-wrap" id="mouth-wrap">
-          <div class="mouth" id="mouth"></div>
+      <div class="idle-actions">
+        <div class="idle-action-col">
+          <button class="btn-call-action btn-audio" onclick="startCall()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26">
+              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2
+                       1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1
+                       C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1
+                       0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
+            </svg>
+          </button>
+          <span class="idle-action-label">Voice</span>
+        </div>
+        <div class="idle-action-col">
+          <button class="btn-call-action btn-video" onclick="startCall()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26">
+              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12
+                       c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+            </svg>
+          </button>
+          <span class="idle-action-label">Video</span>
         </div>
       </div>
 
+      <p class="idle-hint">Uses your mic &amp; camera</p>
     </div>
+  </div>
 
-    <!-- PIA name + live transcript -->
-    <div class="call-info">
-      <h2 class="call-name" id="pia-name">PIA</h2>
-      <div class="transcript-bubble" id="transcript-bubble">
-        <span id="transcript-text"></span>
+  <!-- ── Active call screen — WhatsApp/FaceTime style ───────────────────── -->
+  <div id="screen-call" class="screen">
+
+    <!-- ① PIA fills the whole screen (main "remote" view) -->
+    <div class="pia-main" id="pia-main">
+      <img id="call-photo" src="/static/avatar.jpg" alt="PIA"
+           onerror="this.style.display='none'; document.getElementById('pia-initials').style.opacity='1'" />
+      <div class="pia-initials" id="pia-initials">PIA</div>
+      <!-- speaking glow pulse -->
+      <div class="speak-glow" id="speak-glow"></div>
+      <!-- mouth anim overlay (over lower-face area) -->
+      <div class="mouth-wrap" id="mouth-wrap">
+        <div class="mouth" id="mouth"></div>
       </div>
     </div>
 
-    <!-- Bottom controls -->
+    <!-- ② Top bar: name + timer (fades after 4 s) -->
+    <div class="call-topbar" id="call-topbar">
+      <div class="call-status-dot" id="status-dot"></div>
+      <span id="call-status-text">Connecting…</span>
+      <div style="flex:1"></div>
+      <h2 class="call-name" id="pia-name">PIA</h2>
+      <div style="flex:1"></div>
+      <span class="call-timer" id="call-timer">00:00</span>
+    </div>
+
+    <!-- ③ PIP: user's own camera (bottom-right corner) -->
+    <div class="pip-wrap" id="pip-wrap">
+      <video id="user-cam" autoplay playsinline muted></video>
+      <div class="pip-placeholder" id="pip-placeholder">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26" opacity=".5">
+          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+        </svg>
+      </div>
+      <!-- front/back flip -->
+      <button class="btn-flip" id="btn-flip" onclick="flipCamera()" title="Flip camera">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M9 12l-4-4 4-4v3c3.9 0 7 3.1 7 7 0 1.3-.4 2.6-1 3.6L13.7 16c.4-.9.6-1.9.6-3 0-2.8-2.2-5-5-5V12z"/>
+          <path d="M15 12l4 4-4 4v-3c-3.9 0-7-3.1-7-7 0-1.3.4-2.6 1-3.6L10.3 8c-.4.9-.6 1.9-.6 3 0 2.8 2.2 5 5 5V12z"/>
+        </svg>
+      </button>
+      <!-- back-cam indicator -->
+      <div class="back-badge" id="back-badge">👁 Back cam</div>
+    </div>
+
+    <!-- ④ Caption bar — subtitles floating above controls -->
+    <div class="caption-bar" id="caption-bar">
+      <span id="caption-text"></span>
+    </div>
+
+    <!-- ⑤ Controls: glassmorphic pill at bottom -->
     <div class="call-controls">
+
       <button class="ctrl-btn" id="btn-mute" onclick="toggleMute()" title="Mute / Unmute">
         <svg id="icon-mic" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
           <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08
-                   c3.39-.49 6-3.39 6-6.92h-2z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
         </svg>
         <svg id="icon-mic-off" viewBox="0 0 24 24" fill="currentColor" width="22" height="22" style="display:none">
           <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28z"/>
           <path d="M14.98 11.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99z"/>
-          <path d="M4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.34 3 3 3 .23 0 .44-.03.65-.08l1.66 1.66
-                   c-.71.33-1.5.52-2.31.52-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08
-                   c.57-.08 1.12-.24 1.64-.46L19.73 21 21 19.73 4.27 3z"/>
+          <path d="M4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.34 3 3 3 .23 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c.57-.08 1.12-.24 1.64-.46L19.73 21 21 19.73 4.27 3z"/>
         </svg>
       </button>
 
       <button class="ctrl-btn ctrl-hangup" id="btn-hangup" onclick="endCall()" title="End Call">
         <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26">
-          <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85
-                   -.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08C.11 12.9 0 12.65 0 12.38
-                   c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67
-                   c.18.18.29.43.29.71 0 .27-.11.52-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29
-                   -.27 0-.52-.1-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9
-                   v-3.1C15.15 9.25 13.6 9 12 9z"/>
+          <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08C.11 12.9 0 12.65 0 12.38c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .27-.11.52-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.1-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
         </svg>
       </button>
 
-      <button class="ctrl-btn" id="btn-speaker" onclick="toggleSpeaker()" title="Speaker">
-        <svg id="icon-spk" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05
-                   c1.48-.73 2.5-2.25 2.5-4.02z"/>
-          <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06
-                   C18.01 19.86 21 16.28 21 12c0-4.28-2.99-7.86-7-8.77z"/>
+      <button class="ctrl-btn" id="btn-cam" onclick="toggleCamera()" title="Camera on/off">
+        <svg id="icon-cam-on" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+          <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+        </svg>
+        <svg id="icon-cam-off" viewBox="0 0 24 24" fill="currentColor" width="22" height="22" style="display:none">
+          <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.55-.18L19.73 21 21 19.73 3.27 2z"/>
         </svg>
       </button>
+
     </div>
 
   </div>

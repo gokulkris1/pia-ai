@@ -16,6 +16,7 @@ async def generate_response(
     memory: MemoryManager,
     engine: str | None = None,
     system_prompt_override: str | None = None,
+    image_base64: str | None = None,
 ) -> str:
     """
     Generate a persona-aware AI reply.
@@ -26,6 +27,7 @@ async def generate_response(
         memory:                 conversation memory for this session
         engine:                 'claude' | 'gpt4o'  (defaults to LLM_ENGINE env var)
         system_prompt_override: if provided, replaces the auto-built prompt
+        image_base64:           optional JPEG frame from back camera for visual context
 
     Returns:
         Reply text string
@@ -46,9 +48,9 @@ async def generate_response(
             return await _call_claude(system_prompt, messages)
         except Exception as claude_err:
             print(f"[llm] Claude failed ({claude_err}) — falling back to GPT-4o")
-            return await _call_gpt4o(system_prompt, messages)
+            return await _call_gpt4o(system_prompt, messages, image_base64=image_base64)
     elif engine == "gpt4o":
-        return await _call_gpt4o(system_prompt, messages)
+        return await _call_gpt4o(system_prompt, messages, image_base64=image_base64)
     else:
         raise ValueError(f"Unknown LLM engine '{engine}'. Use 'claude' or 'gpt4o'.")
 
@@ -85,12 +87,36 @@ async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
 
 # ── GPT-4o ────────────────────────────────────────────────────────────────────
 
-async def _call_gpt4o(system_prompt: str, messages: list[dict]) -> str:
+async def _call_gpt4o(system_prompt: str, messages: list[dict], image_base64: str | None = None) -> str:
     api_key = os.getenv("OpenAI_Key")
     if not api_key:
         raise ValueError("OpenAI_Key is not set in environment")
 
-    full_messages = [{"role": "system", "content": system_prompt}] + messages
+    # If an image frame is present, inject it into the last user message as vision content
+    if image_base64:
+        gpt_messages: list[dict] = []
+        for i, m in enumerate(messages):
+            if i == len(messages) - 1 and m["role"] == "user":
+                # Vision-capable content block — back camera: "here's what I'm looking at"
+                gpt_messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": m["content"]},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url":    f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "low",   # 'low' = faster + cheaper, enough for context
+                            },
+                        },
+                    ],
+                })
+            else:
+                gpt_messages.append(m)
+    else:
+        gpt_messages = messages
+
+    full_messages = [{"role": "system", "content": system_prompt}] + gpt_messages
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(

@@ -26,6 +26,14 @@ let callStartTime = null;
 let timerInterval = null;
 let muted = false;
 
+// Camera
+let camStream    = null;      // active MediaStream from getUserMedia
+let camFacing    = 'user';    // 'user' (front) | 'environment' (back)
+let cameraOn     = false;     // whether camera PIP is active
+let lastFrameB64 = null;      // last captured JPEG frame (for vision context)
+let frameInterval = null;     // frame-capture timer when back cam active
+const FRAME_INTERVAL_MS = 4000;  // capture back-cam frame every 4 s
+
 // STT
 let recognition = null;      // SpeechRecognition instance
 let silenceTimer = null;      // debounce: send after silence
@@ -78,6 +86,16 @@ async function startCall() {
   showScreen('screen-call');
   setState('connecting');
 
+  // Auto-hide topbar after 4 s (like a real video call)
+  const topbar = document.getElementById('call-topbar');
+  if (topbar) {
+    clearTimeout(topbar._hideTimer);
+    topbar._hideTimer = setTimeout(() => topbar.classList.add('hidden'), 4000);
+  }
+
+  // Start front camera automatically (non-blocking)
+  initUserCamera('user').catch(() => {});
+
   try {
     // 1. Start backend session
     const res  = await apiFetch('/api/call/start', 'POST');
@@ -114,6 +132,7 @@ async function endCall() {
   // Stop everything
   stopListening();
   stopAudio();
+  stopCamera();
   clearInterval(timerInterval);
 
   const duration = callStartTime ? formatTimer(Date.now() - callStartTime) : '00:00';
@@ -137,6 +156,7 @@ function resetToIdle() {
   callStartTime = null;
   lastTranscript = '';
   clearInterval(timerInterval);
+  stopCamera();
   updateTimer();   // reset to 00:00
   showScreen('screen-idle');
 }
@@ -154,6 +174,108 @@ function toggleMute() {
 
 function toggleSpeaker() {
   if (audioEl) audioEl.muted = !audioEl.muted;
+}
+
+
+// ── Camera (user PIP) ─────────────────────────────────────────────────────────
+
+async function initUserCamera(facing) {
+  // Stop any existing stream
+  if (camStream) {
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+  }
+
+  const pipWrap    = document.getElementById('pip-wrap');
+  const camEl      = document.getElementById('user-cam');
+  const placeholder = document.getElementById('pip-placeholder');
+
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 360 }, height: { ideal: 480 } },
+      audio: false,
+    });
+    camEl.srcObject = camStream;
+    if (placeholder) placeholder.classList.add('hidden');
+    cameraOn  = true;
+    camFacing = facing;
+
+    // Mirror front, don't mirror back
+    pipWrap?.classList.toggle('back-cam', facing === 'environment');
+
+    // Camera-on icon
+    document.getElementById('icon-cam-on')?.style?.setProperty('display','block');
+    document.getElementById('icon-cam-off')?.style?.setProperty('display','none');
+    document.getElementById('btn-cam')?.classList.remove('cam-off');
+
+    // Start periodic frame capture when using back camera (twin sees what you see)
+    clearInterval(frameInterval);
+    if (facing === 'environment') {
+      frameInterval = setInterval(() => { lastFrameB64 = captureFrame(); }, FRAME_INTERVAL_MS);
+    } else {
+      lastFrameB64 = null;
+    }
+
+    console.log(`[cam] Started ${facing} camera`);
+  } catch (err) {
+    console.warn('[cam] Could not start camera:', err.message);
+    cameraOn = false;
+    if (placeholder) placeholder.classList.remove('hidden');
+  }
+}
+
+function captureFrame() {
+  const video = document.getElementById('user-cam');
+  if (!video || !video.srcObject || video.videoWidth === 0) return null;
+  try {
+    const canvas = document.createElement('canvas');
+    // Downscale for API efficiency — 480px wide max
+    const scale = Math.min(1, 480 / video.videoWidth);
+    canvas.width  = Math.round(video.videoWidth  * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const ctx = canvas.getContext('2d');
+    // Don't mirror capture — send raw image to LLM
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.65).split(',')[1];  // base64 only
+  } catch (_) {
+    return null;
+  }
+}
+
+async function flipCamera() {
+  const next = camFacing === 'user' ? 'environment' : 'user';
+  await initUserCamera(next);
+  // Capture one frame immediately after flip
+  if (next === 'environment') {
+    lastFrameB64 = captureFrame();
+  } else {
+    lastFrameB64 = null;
+  }
+}
+
+async function toggleCamera() {
+  const camOn  = document.getElementById('icon-cam-on');
+  const camOff = document.getElementById('icon-cam-off');
+  const btn    = document.getElementById('btn-cam');
+  if (cameraOn) {
+    // Turn off
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    camStream = null; cameraOn = false; lastFrameB64 = null;
+    clearInterval(frameInterval);
+    const placeholder = document.getElementById('pip-placeholder');
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (camOn)  camOn.style.display  = 'none';
+    if (camOff) camOff.style.display = 'block';
+    btn?.classList.add('cam-off');
+  } else {
+    await initUserCamera(camFacing);
+  }
+}
+
+function stopCamera() {
+  clearInterval(frameInterval);
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  cameraOn = false; lastFrameB64 = null;
 }
 
 
@@ -277,11 +399,15 @@ async function processUserSpeech(text) {
   setState('processing');
   showTranscript(`You: ${text}`, false);
 
+  // Capture a fresh frame if using back camera (twin sees what you see)
+  const frameForApi = camFacing === 'environment' ? (captureFrame() || lastFrameB64) : null;
+
   try {
-    // 1. Get LLM reply
+    // 1. Get LLM reply (optionally with visual frame for context)
     const chatRes = await apiFetch('/api/chat', 'POST', {
       session_id:   sessionId,
       user_message: text,
+      ...(frameForApi ? { image_base64: frameForApi } : {}),
     });
 
     const reply = chatRes.reply;
@@ -351,18 +477,26 @@ function stopAudio() {
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
 function showTranscript(text, persist = false) {
-  const bubble = document.getElementById('transcript-bubble');
-  const span   = document.getElementById('transcript-text');
-  if (!bubble || !span) return;
+  // New design: caption bar floating above controls
+  const captionEl = document.getElementById('caption-text');
+  // Also re-show topbar briefly when there's activity
+  const topbar = document.getElementById('call-topbar');
+  if (!captionEl) return;
 
-  span.textContent = text;
-  bubble.classList.toggle('show', !!text);
+  captionEl.textContent = text;
+  captionEl.classList.toggle('show', !!text);
+
+  if (topbar && text) {
+    topbar.classList.remove('hidden');
+    clearTimeout(topbar._hideTimer);
+    topbar._hideTimer = setTimeout(() => topbar.classList.add('hidden'), 3500);
+  }
 
   if (!persist && text) {
-    clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => {
-      bubble.classList.remove('show');
-    }, 4000);
+    clearTimeout(captionEl._hideTimer);
+    captionEl._hideTimer = setTimeout(() => {
+      captionEl.classList.remove('show');
+    }, 5000);
   }
 }
 
@@ -409,6 +543,18 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Init avatar animator (loads config from /api/avatar/config)
   await avatar.init();
+
+  // Load persona name / subtitle onto idle screen
+  try {
+    const health = await apiFetch('/api/health');
+    const twinName = health.twin || 'PIA';
+    const userName = health.user || '';
+    const idleName = document.getElementById('idle-name');
+    if (idleName) idleName.textContent = twinName;
+    // Update subtitle to reflect whose twin this is
+    const sub = document.querySelector('.idle-subtitle');
+    if (sub && userName) sub.textContent = `${userName}'s personal AI twin • always on`;
+  } catch (_) {}
 
   // Keyboard shortcut: Space = call/hang up, M = mute
   document.addEventListener('keydown', (e) => {

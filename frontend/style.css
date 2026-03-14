@@ -44,27 +44,56 @@ html, body {
   transform: translateY(0);
 }
 
-/* ── Idle screen ───────────────────────────────────────────────────────────── */
+/* ── Idle screen ─────────────────────────────────────────────────────────── */
+
+/* Blurred full-bleed background */
+.idle-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  background: #111;
+}
+.idle-bg img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  filter: blur(28px) brightness(.55) saturate(1.2);
+  transform: scale(1.08);
+}
+.idle-bg.no-photo { background: linear-gradient(160deg, #1a1a2e, #0d0d0d); }
+
+.idle-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,.2) 0%, rgba(0,0,0,.55) 100%);
+  z-index: 1;
+}
+
 .idle-content {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .idle-avatar {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 130px;
+  height: 130px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: 3px solid rgba(255,255,255,.2);
   margin-bottom: 4px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.5);
 }
 .idle-avatar img {
   width: 100%; height: 100%;
   object-fit: cover;
+  object-position: center top;
 }
 .idle-avatar-initials {
   position: absolute;
@@ -72,7 +101,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.4rem;
+  font-size: 2.8rem;
   font-weight: 700;
   color: var(--text-muted);
   opacity: 0;
@@ -84,19 +113,54 @@ html, body {
   font-size: 2.2rem;
   font-weight: 700;
   letter-spacing: -0.5px;
+  text-shadow: 0 1px 8px rgba(0,0,0,.7);
 }
 .idle-subtitle {
-  font-size: .95rem;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  font-size: .88rem;
+  color: rgba(255,255,255,.65);
+  margin-bottom: 16px;
 }
 .idle-hint {
-  font-size: .78rem;
-  color: #555;
-  margin-top: 6px;
+  font-size: .75rem;
+  color: rgba(255,255,255,.35);
+  margin-top: 4px;
 }
 
-/* ── Call button ───────────────────────────────────────────────────────────── */
+/* Two-button call row (voice + video) */
+.idle-actions {
+  display: flex;
+  gap: 32px;
+  margin-top: 8px;
+}
+.idle-action-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.btn-call-action {
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: transform .15s, filter .15s;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.btn-call-action:hover  { filter: brightness(1.15); transform: scale(1.06); }
+.btn-call-action:active { transform: scale(0.94); }
+.btn-audio { background: var(--green); }
+.btn-video { background: var(--blue); }
+.idle-action-label {
+  font-size: .78rem;
+  color: rgba(255,255,255,.75);
+  font-weight: 500;
+}
+
+/* Keep old .btn-call for ended screen */
 .btn-call {
   display: flex;
   align-items: center;
@@ -109,32 +173,129 @@ html, body {
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 0 0 0 rgba(52,199,89,0.4);
-  transition: transform .15s, box-shadow .15s;
+  transition: transform .15s;
 }
 .btn-call:hover  { transform: scale(1.04); }
 .btn-call:active { transform: scale(0.97); }
 .btn-call-again  { margin-top: 16px; }
 
 /* ── Call screen ───────────────────────────────────────────────────────────── */
+/* ── Call screen: video-call layout ────────────────────────────────────────── */
 #screen-call {
-  background: radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, var(--bg) 70%);
+  background: #000;
+  overflow: hidden;
 }
 
-/* Top bar */
+/* ① PIA main view – fills entire screen like a video call remote feed */
+.pia-main {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #111;
+}
+.pia-main img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  transition: filter .3s ease;
+}
+.pia-main.speaking img {
+  filter: brightness(1.08);
+}
+/* speaking glow — radial bloom that pulses */
+.speak-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(52,199,89,0.18) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+.pia-main.speaking .speak-glow {
+  opacity: 1;
+  animation: glow-pulse 1.2s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: .6; }
+  50%       { opacity: 1; }
+}
+/* initials fallback (shown if photo missing) */
+.pia-initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  opacity: 0;
+  background: linear-gradient(160deg, #1a1a2e, #0d0d0d);
+}
+
+/* Top+bottom gradient covers for readability */
+.pia-main::before,
+.pia-main::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.pia-main::before {
+  top: 0; height: 120px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent);
+}
+.pia-main::after {
+  bottom: 0; height: 200px;
+  background: linear-gradient(to top, rgba(0,0,0,.75), transparent);
+}
+
+/* Mouth anim overlay */
+.mouth-wrap {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+  z-index: 2;
+}
+.pia-main.speaking .mouth-wrap { opacity: 1; }
+.mouth {
+  width: 40px;
+  height: 4px;
+  background: rgba(0,0,0,0.55);
+  border-radius: 99px;
+  transition: height .06s linear, border-radius .06s linear;
+}
+
+/* ② Top bar */
 .call-topbar {
   position: absolute;
   top: 0; left: 0; right: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 20px 24px;
+  padding: env(safe-area-inset-top, 16px) 20px 16px;
+  z-index: 10;
+  transition: opacity .5s ease;
 }
+.call-topbar.hidden { opacity: 0; pointer-events: none; }
+
 .call-status-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--text-muted);
   transition: background .3s;
+  flex-shrink: 0;
 }
 .call-status-dot.connected { background: var(--green); }
 .call-status-dot.speaking  {
@@ -145,185 +306,153 @@ html, body {
   0%, 100% { opacity: 1; }
   50%       { opacity: .3; }
 }
-
 #call-status-text {
-  font-size: .85rem;
-  color: var(--text-muted);
-  flex: 1;
+  font-size: .78rem;
+  color: rgba(255,255,255,.7);
+}
+.call-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
 }
 .call-timer {
-  font-size: .85rem;
-  color: var(--text-muted);
+  font-size: .78rem;
+  color: rgba(255,255,255,.7);
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Avatar + rings ─────────────────────────────────────────────────────────── */
-.call-avatar-wrap {
-  position: relative;
-  width: calc(var(--avatar-size) + 120px);
-  height: calc(var(--avatar-size) + 120px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-
-/* Ripple rings */
-.ring {
+/* ③ PIP: user camera — bottom-right corner */
+.pip-wrap {
   position: absolute;
-  border-radius: 50%;
-  border: 2px solid var(--ring-color);
-  opacity: 0;
-  transition: opacity .3s;
-}
-.ring-1 { width: calc(var(--avatar-size) + 40px);  height: calc(var(--avatar-size) + 40px); }
-.ring-2 { width: calc(var(--avatar-size) + 80px);  height: calc(var(--avatar-size) + 80px); }
-.ring-3 { width: calc(var(--avatar-size) + 120px); height: calc(var(--avatar-size) + 120px); }
-
-.call-avatar-wrap.speaking .ring-1 {
-  opacity: 1;
-  animation: ring-pulse 1.6s ease-out infinite;
-}
-.call-avatar-wrap.speaking .ring-2 {
-  opacity: 1;
-  animation: ring-pulse 1.6s ease-out .4s infinite;
-}
-.call-avatar-wrap.speaking .ring-3 {
-  opacity: 1;
-  animation: ring-pulse 1.6s ease-out .8s infinite;
-}
-@keyframes ring-pulse {
-  0%   { transform: scale(.9);  opacity: .6; }
-  100% { transform: scale(1.1); opacity: 0;  }
-}
-
-/* Avatar circle */
-.call-avatar {
-  position: relative;
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  border-radius: 50%;
+  bottom: 120px;
+  right: 16px;
+  width: 110px;
+  height: 155px;
+  border-radius: 18px;
   overflow: hidden;
-  background: var(--surface);
-  border: 3px solid rgba(255,255,255,0.1);
-  flex-shrink: 0;
-  animation: idle-breathe 4s ease-in-out infinite;
+  background: #1a1a1a;
+  border: 2px solid rgba(255,255,255,.15);
+  box-shadow: 0 4px 24px rgba(0,0,0,.6);
+  z-index: 10;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
 }
-@keyframes idle-breathe {
-  0%, 100% { transform: scale(1);     }
-  50%       { transform: scale(1.012); }
-}
+.pip-wrap:active { transform: scale(0.97); }
 
-.call-avatar img {
+.pip-wrap video {
   width: 100%; height: 100%;
   object-fit: cover;
-  object-position: center top;
+  transform: scaleX(-1); /* mirror front cam */
   display: block;
 }
-.avatar-initials {
+.pip-wrap.back-cam video {
+  transform: scaleX(1); /* don't mirror back cam */
+}
+.pip-placeholder {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 5rem;
-  font-weight: 700;
   color: var(--text-muted);
-  opacity: 0;
 }
-.call-avatar.no-photo .avatar-initials { opacity: 1; }
-.call-avatar.no-photo img { display: none; }
+.pip-placeholder.hidden { display: none; }
 
-/* Mouth overlay */
-.mouth-wrap {
+.btn-flip {
   position: absolute;
-  bottom: 25%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 20px;
+  bottom: 6px;
+  right: 6px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .2s;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+  transition: background .15s;
 }
-.call-avatar-wrap.speaking .mouth-wrap { opacity: 1; }
+.btn-flip:hover { background: rgba(0,0,0,.8); }
 
-.mouth {
-  width: 40px;
-  height: 4px;
-  background: rgba(0,0,0,0.6);
-  border-radius: 99px;
-  transition: height .06s linear, border-radius .06s linear;
-}
-
-/* ── Call info / transcript ─────────────────────────────────────────────────── */
-.call-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 0 20px;
-  max-width: 360px;
-  width: 100%;
-}
-
-.call-name {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-
-.transcript-bubble {
-  min-height: 44px;
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 10px 16px;
-  font-size: .9rem;
-  color: var(--text-muted);
+.back-badge {
+  position: absolute;
+  top: 6px;
+  left: 0; right: 0;
   text-align: center;
-  width: 100%;
+  font-size: .62rem;
+  color: rgba(255,255,255,.9);
+  background: rgba(255,165,0,.7);
+  padding: 2px 0;
+  display: none;
+}
+.pip-wrap.back-cam .back-badge { display: block; }
+
+/* ④ Caption bar */
+.caption-bar {
+  position: absolute;
+  bottom: 108px;
+  left: 20px;
+  right: 140px; /* leave room for PIP */
+  z-index: 10;
+  padding: 0 0 6px;
+  pointer-events: none;
+}
+#caption-text {
+  display: inline-block;
+  font-size: .92rem;
+  line-height: 1.45;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0,0,0,.9), 0 0 20px rgba(0,0,0,.7);
+  font-weight: 500;
+  max-width: 100%;
+  background: rgba(0,0,0,.35);
+  border-radius: 8px;
+  padding: 4px 10px;
   opacity: 0;
   transition: opacity .25s;
-  line-height: 1.45;
 }
-.transcript-bubble.show { opacity: 1; }
+#caption-text.show { opacity: 1; }
 
-/* ── Call controls ─────────────────────────────────────────────────────────── */
+/* ⑤ Controls: glass pill at bottom */
 .call-controls {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 32px 0 44px;
+  gap: 24px;
+  padding: 20px 0 calc(env(safe-area-inset-bottom, 0px) + 28px);
+  background: linear-gradient(to top, rgba(0,0,0,.6) 0%, transparent 100%);
+  z-index: 10;
 }
-
 .ctrl-btn {
-  width: 60px; height: 60px;
+  width: 58px; height: 58px;
   border-radius: 50%;
   border: none;
-  background: var(--surface);
-  color: var(--text);
+  background: rgba(255,255,255,.15);
+  backdrop-filter: blur(10px);
+  color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background .15s, transform .12s;
 }
-.ctrl-btn:hover  { background: #2c2c2c; }
+.ctrl-btn:hover  { background: rgba(255,255,255,.25); }
 .ctrl-btn:active { transform: scale(0.93); }
-.ctrl-btn.muted  { background: #3a1010; color: var(--red); }
+.ctrl-btn.muted  { background: rgba(255,59,48,.35); }
+.ctrl-btn.cam-off { background: rgba(255,59,48,.35); }
 
 .ctrl-hangup {
-  width: 70px; height: 70px;
+  width: 68px; height: 68px;
   background: var(--red);
-  color: #fff;
+  backdrop-filter: none;
 }
-.ctrl-hangup:hover  { background: #cc2f27; }
+.ctrl-hangup:hover { background: #cc2f27; }
 
 /* ── Ended screen ──────────────────────────────────────────────────────────── */
 .ended-content {

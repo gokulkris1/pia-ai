@@ -168,7 +168,8 @@ class AvatarAnimator {
   }
 
   _setSpeakingState(speaking) {
-    document.querySelector('.call-avatar-wrap')?.classList.toggle('speaking', speaking);
+    // Drive the fullscreen pia-main speaking state (glow, mouth, brightness)
+    document.querySelector('.pia-main')?.classList.toggle('speaking', speaking);
 
     // ── TRAINING HOOK: future lip-sync provider would be called here ─────────
     // if (speaking && this._cfg?.future?.lip_sync) { this._startLipSync(); }
@@ -182,44 +183,11 @@ class AvatarAnimator {
     const root   = document.documentElement;
     const avatar = document.querySelector('.call-avatar');
 
-    // Avatar size
-    if (cfg.size_desktop) {
-      root.style.setProperty('--avatar-size', `${cfg.size_desktop}px`);
-    }
-
     // Photo position
     const photos = document.querySelectorAll('#idle-photo, #call-photo');
     photos.forEach(img => {
       img.style.objectPosition = cfg.object_position || 'center top';
     });
-
-    // Idle animation
-    if (avatar && cfg.idle_mode === 'breathe') {
-      const min = cfg.idle_scale_min ?? 1.0;
-      const max = cfg.idle_scale_max ?? 1.012;
-      const dur = cfg.idle_duration  ?? 4;
-      // Inject dynamic keyframes
-      const id  = 'pia-idle-breathe';
-      if (!document.getElementById(id)) {
-        const s = document.createElement('style');
-        s.id = id;
-        s.textContent = `
-          @keyframes idle-breathe-dynamic {
-            0%, 100% { transform: scale(${min}); }
-            50%       { transform: scale(${max}); }
-          }
-        `;
-        document.head.appendChild(s);
-        if (avatar) {
-          avatar.style.animation = `idle-breathe-dynamic ${dur}s ease-in-out infinite`;
-        }
-      }
-    }
-
-    // Ripple ring colour
-    if (cfg.ring_color) {
-      root.style.setProperty('--ring-color', cfg.ring_color);
-    }
 
     // ── TRAINING HOOK: future facial/body capability flags ─────────────────
     // if (cfg.future?.facial_expressions) { this._initExpressionEngine(); }

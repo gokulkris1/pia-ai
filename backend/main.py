@@ -61,6 +61,7 @@ PERSONA = USER_PROFILE.persona
 class ChatRequest(BaseModel):
     session_id: str
     user_message: str
+    image_base64: str | None = None   # optional JPEG frame from back camera (vision context)
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -257,6 +258,7 @@ async def chat(req: ChatRequest):
         persona=profile.persona,
         memory=session.memory,
         system_prompt_override=system_prompt,
+        image_base64=req.image_base64,
     )
 
     # Persist to memory
