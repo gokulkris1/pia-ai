@@ -7,6 +7,9 @@ services:
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
+        value: 3.11.8
+    envVars:
+      - key: PYTHON_VERSION
         value: 3.11.0
       # Add these in the Render dashboard → Environment tab:
       # calude_key        = sk-ant-...
