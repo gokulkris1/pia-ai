@@ -214,6 +214,10 @@ function camTap() {
     if (vid) vid.style.display = 'none';
     if (hint) hint.textContent = 'Looking good! Tap Upload to change it.';
     if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; camActive = false; }
+    // Persist to localStorage so the call screen can use it even on Netlify
+    const reader = new FileReader();
+    reader.onload = () => localStorage.setItem('pia_avatar', reader.result);
+    reader.readAsDataURL(blob);
   }, 'image/jpeg', 0.88);
 }
 
@@ -228,6 +232,10 @@ function fileChosen(e) {
   if (snap) { snap.src = url; snap.style.display = 'block'; }
   if (ico)  ico.style.display = 'none';
   if (hint) hint.textContent = 'Photo selected \u2713';
+  // Persist to localStorage so it's available across sessions / on Netlify
+  const reader = new FileReader();
+  reader.onload = () => localStorage.setItem('pia_avatar', reader.result);
+  reader.readAsDataURL(file);
 }
 
 /* ─────────── step 5: finish ─────────── */

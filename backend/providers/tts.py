@@ -116,3 +116,64 @@ async def _call_openai_tts(text: str) -> bytes:
         raise ValueError(f"OpenAI TTS error {resp.status_code}: {resp.text}")
 
     return resp.content
+
+
+# ── ElevenLabs Voice Cloning ─────────────────────────────────────────────────
+
+async def clone_voice_elevenlabs(
+    audio_bytes: bytes,
+    voice_name: str,
+    mime_type: str = "audio/webm",
+) -> str | None:
+    """
+    Upload a voice sample to ElevenLabs and create a cloned voice.
+
+    Args:
+        audio_bytes: raw audio bytes (webm/ogg/mp4/wav)
+        voice_name:  label for the cloned voice in ElevenLabs
+        mime_type:   MIME type of the audio data
+
+    Returns:
+        voice_id string if successful, None on failure
+    """
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        print("[voice-clone] ELEVENLABS_API_KEY not set — skipping clone")
+        return None
+
+    # Choose a sensible file extension
+    ext_map = {
+        "audio/webm": "webm",
+        "audio/ogg":  "ogg",
+        "audio/mp4":  "m4a",
+        "audio/wav":  "wav",
+        "audio/mpeg": "mp3",
+    }
+    ext = ext_map.get(mime_type.split(";")[0].strip(), "webm")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.elevenlabs.io/v1/voices/add",
+                headers={"xi-api-key": api_key},
+                data={
+                    "name":        voice_name,
+                    "description": f"Cloned voice for {voice_name} AI twin",
+                },
+                files={
+                    "files": (f"voice_sample.{ext}", audio_bytes, mime_type),
+                },
+            )
+
+        if resp.status_code not in (200, 201):
+            print(f"[voice-clone] ElevenLabs API error {resp.status_code}: {resp.text}")
+            return None
+
+        data = resp.json()
+        voice_id = data.get("voice_id")
+        print(f"[voice-clone] Created cloned voice '{voice_name}' → voice_id={voice_id}")
+        return voice_id
+
+    except Exception as e:
+        print(f"[voice-clone] Failed: {e}")
+        return None

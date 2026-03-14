@@ -16,10 +16,10 @@
   },
 
   "synthesis_settings": {
-    "model": "eleven_turbo_v2",
-    "stability": 0.5,
-    "similarity_boost": 0.75,
-    "style": 0.2,
+    "model": "eleven_turbo_v2_5",
+    "stability": 0.33,
+    "similarity_boost": 0.88,
+    "style": 0.45,
     "use_speaker_boost": true
   },
 

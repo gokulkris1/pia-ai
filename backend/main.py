@@ -27,7 +27,7 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 from providers.stt import transcribe_audio
 from providers.llm import generate_response
-from providers.tts import synthesize_speech
+from providers.tts import synthesize_speech, clone_voice_elevenlabs
 from users.loader import load_user_profile, list_users
 from persona.prompt_builder import build_system_prompt
 from avatar.config import get_avatar_config
@@ -141,14 +141,42 @@ async def save_onboard_profile(data: OnboardProfile):
 
 @app.post("/api/onboard/voice-sample")
 async def save_voice_sample(file: UploadFile = File(...)):
-    """Store the user's voice recording for future ElevenLabs cloning."""
+    """Store and clone the user's voice via ElevenLabs."""
     user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
     user_dir.mkdir(parents=True, exist_ok=True)
-    out_path = user_dir / "voice_sample.webm"
-    content  = await file.read()
+
+    content   = await file.read()
+    mime_type = file.content_type or "audio/webm"
+
+    # Persist the raw sample
+    ext       = mime_type.split("/")[-1].split(";")[0] or "webm"
+    out_path  = user_dir / f"voice_sample.{ext}"
     out_path.write_bytes(content)
-    print(f"[onboard] Voice sample saved ({len(content):,} bytes)")
-    return {"status": "saved", "bytes": len(content)}
+    print(f"[onboard] Voice sample saved ({len(content):,} bytes, {mime_type})")
+
+    # Try to clone via ElevenLabs
+    profile    = load_user_profile(DEFAULT_USER_ID)
+    voice_name = f"{profile.display_name}'s Pia"
+    voice_id   = await clone_voice_elevenlabs(content, voice_name, mime_type)
+
+    if voice_id:
+        # Update voice.json so future TTS calls use the cloned voice
+        voice_path = user_dir / "voice.json"
+        try:
+            voice_data = json.loads(voice_path.read_text()) if voice_path.exists() else {}
+        except Exception:
+            voice_data = {}
+
+        voice_data.setdefault("active_voice", {})
+        voice_data["active_voice"]["voice_id"]   = voice_id
+        voice_data["active_voice"]["voice_name"]  = voice_name
+        voice_data["active_voice"]["is_cloned"]   = True
+        voice_data["active_voice"]["cloned_at"]   = datetime.utcnow().isoformat()
+        voice_path.write_text(json.dumps(voice_data, indent=2))
+        print(f"[onboard] voice.json updated with cloned voice_id={voice_id}")
+        return {"status": "cloned", "voice_id": voice_id, "bytes": len(content)}
+
+    return {"status": "saved", "voice_id": None, "bytes": len(content)}
 
 
 @app.post("/api/onboard/photo")

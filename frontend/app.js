@@ -93,6 +93,31 @@ async function startCall() {
     topbar._hideTimer = setTimeout(() => topbar.classList.add('hidden'), 4000);
   }
 
+  // ── PRE-REQUEST MIC PERMISSION ───────────────────────────────────────────
+  // Must happen inside a user gesture (button click). Ask now so the dialog
+  // appears before call starts rather than silently failing mid-call.
+  try {
+    const micCheck = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micCheck.getTracks().forEach(t => t.stop());  // immediately release; we just needed the grant
+    console.log('[call] mic permission granted');
+  } catch (micErr) {
+    console.warn('[call] mic permission denied:', micErr.message);
+    showTranscript('⚠ Microphone access denied — check browser settings', true);
+    setTimeout(resetToIdle, 3500);
+    return;
+  }
+
+  // Load avatar from localStorage (persists across sessions, works on Netlify)
+  const savedAvatar = localStorage.getItem('pia_avatar');
+  if (savedAvatar) {
+    document.querySelectorAll('#idle-photo, #call-photo').forEach(img => {
+      img.src = savedAvatar;
+    });
+    // Also update blurred background
+    const bgImg = document.querySelector('.idle-bg img');
+    if (bgImg) bgImg.src = savedAvatar;
+  }
+
   // Start front camera automatically (non-blocking)
   initUserCamera('user').catch(() => {});
 
@@ -196,6 +221,7 @@ async function initUserCamera(facing) {
       audio: false,
     });
     camEl.srcObject = camStream;
+    await camEl.play().catch(() => {}); // required on iOS/Safari — autoplay alone isn't enough
     if (placeholder) placeholder.classList.add('hidden');
     cameraOn  = true;
     camFacing = facing;
@@ -543,6 +569,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Init avatar animator (loads config from /api/avatar/config)
   await avatar.init();
+
+  // Restore saved avatar photo immediately (works even offline)
+  const savedAvatar = localStorage.getItem('pia_avatar');
+  if (savedAvatar) {
+    document.querySelectorAll('#idle-photo, #call-photo').forEach(img => {
+      img.src = savedAvatar;
+    });
+    const bgImg = document.querySelector('.idle-bg img');
+    if (bgImg) bgImg.src = savedAvatar;
+  }
 
   // Load persona name / subtitle onto idle screen
   try {
