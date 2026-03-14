@@ -1,10 +1,23 @@
 [build]
-  publish = "."
+  publish = "frontend"
   command = ""
 
-[functions]
-  directory = "netlify/functions"
+# API calls are proxied to the FastAPI backend on Render.
+# Set BACKEND_URL in Netlify → Site settings → Environment variables.
+# Value should be your Render service URL, e.g. https://pia-backend.onrender.com
+[[redirects]]
+  from = "/api/*"
+  to = ":BACKEND_URL/api/:splat"
+  status = 200
+  force = true
 
+[[redirects]]
+  from = "/onboard"
+  to = ":BACKEND_URL/onboard"
+  status = 200
+  force = true
+
+# SPA fallback — serve index.html for all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
