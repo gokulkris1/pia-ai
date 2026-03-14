@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <title>PIA — Personal AI Twin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ── Idle / Pre-call screen ───────────────────────────────────────────── -->
+  <div id="screen-idle" class="screen active">
+    <div class="idle-content">
+      <div class="idle-avatar">
+        <img id="idle-photo" src="/static/avatar.jpg" alt="PIA"
+             onerror="this.src=''; this.parentElement.classList.add('no-photo')" />
+        <div class="idle-avatar-initials">PIA</div>
+      </div>
+      <h1 class="idle-name">PIA</h1>
+      <p class="idle-subtitle">Your Personal AI Twin</p>
+      <button id="btn-call" class="btn-call" onclick="startCall()">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2
+                   1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1
+                   C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1
+                   0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
+        </svg>
+        Call PIA
+      </button>
+      <p class="idle-hint">Uses your microphone &amp; speakers</p>
+    </div>
+  </div>
+
+  <!-- ── Active call screen ───────────────────────────────────────────────── -->
+  <div id="screen-call" class="screen">
+
+    <!-- Top bar: status + timer -->
+    <div class="call-topbar">
+      <div class="call-status-dot" id="status-dot"></div>
+      <span id="call-status-text">Connecting…</span>
+      <span class="call-timer" id="call-timer">00:00</span>
+    </div>
+
+    <!-- Avatar area -->
+    <div class="call-avatar-wrap">
+
+      <!-- Ripple rings (visible when PIA speaks) -->
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+
+      <!-- Avatar circle -->
+      <div class="call-avatar" id="call-avatar">
+        <img id="call-photo" src="/static/avatar.jpg" alt="PIA"
+             onerror="this.src=''; this.parentElement.classList.add('no-photo')" />
+        <div class="avatar-initials">PIA</div>
+
+        <!-- Mouth overlay — driven by audio amplitude -->
+        <div class="mouth-wrap" id="mouth-wrap">
+          <div class="mouth" id="mouth"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PIA name + live transcript -->
+    <div class="call-info">
+      <h2 class="call-name" id="pia-name">PIA</h2>
+      <div class="transcript-bubble" id="transcript-bubble">
+        <span id="transcript-text"></span>
+      </div>
+    </div>
+
+    <!-- Bottom controls -->
+    <div class="call-controls">
+      <button class="ctrl-btn" id="btn-mute" onclick="toggleMute()" title="Mute / Unmute">
+        <svg id="icon-mic" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08
+                   c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <svg id="icon-mic-off" viewBox="0 0 24 24" fill="currentColor" width="22" height="22" style="display:none">
+          <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28z"/>
+          <path d="M14.98 11.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99z"/>
+          <path d="M4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.34 3 3 3 .23 0 .44-.03.65-.08l1.66 1.66
+                   c-.71.33-1.5.52-2.31.52-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08
+                   c.57-.08 1.12-.24 1.64-.46L19.73 21 21 19.73 4.27 3z"/>
+        </svg>
+      </button>
+
+      <button class="ctrl-btn ctrl-hangup" id="btn-hangup" onclick="endCall()" title="End Call">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26">
+          <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85
+                   -.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08C.11 12.9 0 12.65 0 12.38
+                   c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67
+                   c.18.18.29.43.29.71 0 .27-.11.52-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29
+                   -.27 0-.52-.1-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9
+                   v-3.1C15.15 9.25 13.6 9 12 9z"/>
+        </svg>
+      </button>
+
+      <button class="ctrl-btn" id="btn-speaker" onclick="toggleSpeaker()" title="Speaker">
+        <svg id="icon-spk" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05
+                   c1.48-.73 2.5-2.25 2.5-4.02z"/>
+          <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06
+                   C18.01 19.86 21 16.28 21 12c0-4.28-2.99-7.86-7-8.77z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ── Call ended / summary screen ─────────────────────────────────────── -->
+  <div id="screen-ended" class="screen">
+    <div class="ended-content">
+      <div class="ended-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5
+                   v-9l6 4.5-6 4.5z"/>
+        </svg>
+      </div>
+      <h2>Call Ended</h2>
+      <p id="ended-duration" class="ended-duration">Duration: 00:00</p>
+      <p id="ended-turns" class="ended-turns">0 exchanges</p>
+      <button class="btn-call btn-call-again" onclick="resetToIdle()">Call Again</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/avatar.js"></script>
+  <script src="/static/app.js"></script>
+
+</body>
+</html>

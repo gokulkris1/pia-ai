@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment — never commit real keys
+.env
+
+# Memory store (session data)
+memory/*.json
+!memory/.gitkeep
+
+# Editor
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

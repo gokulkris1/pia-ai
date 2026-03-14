@@ -1,0 +1,354 @@
+/* ── Reset & base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #0d0d0d;
+  --bg2:        #161616;
+  --surface:    #1e1e1e;
+  --green:      #34c759;
+  --red:        #ff3b30;
+  --blue:       #0a84ff;
+  --text:       #f5f5f5;
+  --text-muted: #888;
+  --border:     rgba(255,255,255,0.08);
+  --avatar-size: 200px;
+  --ring-color: rgba(52, 199, 89, 0.35);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── Screen router ─────────────────────────────────────────────────────────── */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+/* ── Idle screen ───────────────────────────────────────────────────────────── */
+.idle-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.idle-avatar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  margin-bottom: 4px;
+}
+.idle-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.idle-avatar-initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  opacity: 0;
+}
+.idle-avatar.no-photo .idle-avatar-initials { opacity: 1; }
+.idle-avatar.no-photo img { display: none; }
+
+.idle-name {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.idle-subtitle {
+  font-size: .95rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.idle-hint {
+  font-size: .78rem;
+  color: #555;
+  margin-top: 6px;
+}
+
+/* ── Call button ───────────────────────────────────────────────────────────── */
+.btn-call {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 2rem;
+  padding: 16px 36px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 0 0 rgba(52,199,89,0.4);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-call:hover  { transform: scale(1.04); }
+.btn-call:active { transform: scale(0.97); }
+.btn-call-again  { margin-top: 16px; }
+
+/* ── Call screen ───────────────────────────────────────────────────────────── */
+#screen-call {
+  background: radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, var(--bg) 70%);
+}
+
+/* Top bar */
+.call-topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px;
+}
+.call-status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background .3s;
+}
+.call-status-dot.connected { background: var(--green); }
+.call-status-dot.speaking  {
+  background: var(--blue);
+  animation: dot-pulse .8s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .3; }
+}
+
+#call-status-text {
+  font-size: .85rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+.call-timer {
+  font-size: .85rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Avatar + rings ─────────────────────────────────────────────────────────── */
+.call-avatar-wrap {
+  position: relative;
+  width: calc(var(--avatar-size) + 120px);
+  height: calc(var(--avatar-size) + 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+/* Ripple rings */
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--ring-color);
+  opacity: 0;
+  transition: opacity .3s;
+}
+.ring-1 { width: calc(var(--avatar-size) + 40px);  height: calc(var(--avatar-size) + 40px); }
+.ring-2 { width: calc(var(--avatar-size) + 80px);  height: calc(var(--avatar-size) + 80px); }
+.ring-3 { width: calc(var(--avatar-size) + 120px); height: calc(var(--avatar-size) + 120px); }
+
+.call-avatar-wrap.speaking .ring-1 {
+  opacity: 1;
+  animation: ring-pulse 1.6s ease-out infinite;
+}
+.call-avatar-wrap.speaking .ring-2 {
+  opacity: 1;
+  animation: ring-pulse 1.6s ease-out .4s infinite;
+}
+.call-avatar-wrap.speaking .ring-3 {
+  opacity: 1;
+  animation: ring-pulse 1.6s ease-out .8s infinite;
+}
+@keyframes ring-pulse {
+  0%   { transform: scale(.9);  opacity: .6; }
+  100% { transform: scale(1.1); opacity: 0;  }
+}
+
+/* Avatar circle */
+.call-avatar {
+  position: relative;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 3px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+  animation: idle-breathe 4s ease-in-out infinite;
+}
+@keyframes idle-breathe {
+  0%, 100% { transform: scale(1);     }
+  50%       { transform: scale(1.012); }
+}
+
+.call-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.avatar-initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 5rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  opacity: 0;
+}
+.call-avatar.no-photo .avatar-initials { opacity: 1; }
+.call-avatar.no-photo img { display: none; }
+
+/* Mouth overlay */
+.mouth-wrap {
+  position: absolute;
+  bottom: 25%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+}
+.call-avatar-wrap.speaking .mouth-wrap { opacity: 1; }
+
+.mouth {
+  width: 40px;
+  height: 4px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 99px;
+  transition: height .06s linear, border-radius .06s linear;
+}
+
+/* ── Call info / transcript ─────────────────────────────────────────────────── */
+.call-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.call-name {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.transcript-bubble {
+  min-height: 44px;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: .9rem;
+  color: var(--text-muted);
+  text-align: center;
+  width: 100%;
+  opacity: 0;
+  transition: opacity .25s;
+  line-height: 1.45;
+}
+.transcript-bubble.show { opacity: 1; }
+
+/* ── Call controls ─────────────────────────────────────────────────────────── */
+.call-controls {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px 0 44px;
+}
+
+.ctrl-btn {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, transform .12s;
+}
+.ctrl-btn:hover  { background: #2c2c2c; }
+.ctrl-btn:active { transform: scale(0.93); }
+.ctrl-btn.muted  { background: #3a1010; color: var(--red); }
+
+.ctrl-hangup {
+  width: 70px; height: 70px;
+  background: var(--red);
+  color: #fff;
+}
+.ctrl-hangup:hover  { background: #cc2f27; }
+
+/* ── Ended screen ──────────────────────────────────────────────────────────── */
+.ended-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.ended-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ended-content h2     { font-size: 1.8rem; font-weight: 700; }
+.ended-duration       { color: var(--text-muted); font-size: 1rem; }
+.ended-turns          { color: #555; font-size: .85rem; }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 380px) {
+  :root { --avatar-size: 160px; }
+  .call-name { font-size: 1.3rem; }
+  .idle-name { font-size: 1.8rem; }
+}

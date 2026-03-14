@@ -1,0 +1,65 @@
+{
+  "_comment": "Voice profile for TTS output. Set your cloned ElevenLabs voice ID here.",
+
+  "user_id": "default",
+  "version": "1.0",
+  "last_updated": "2026-03-14",
+
+  "provider": "elevenlabs",
+
+  "active_voice": {
+    "voice_id": "21m00Tcm4TlvDq8ikWAM",
+    "voice_name": "Rachel (default — replace with your cloned voice)",
+    "is_cloned": false,
+    "language": "en",
+    "accent": "neutral"
+  },
+
+  "synthesis_settings": {
+    "model": "eleven_turbo_v2",
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.2,
+    "use_speaker_boost": true
+  },
+
+  "pacing": {
+    "words_per_minute_target": 145,
+    "max_response_length_words": 80,
+    "pause_after_question": true,
+    "pause_after_emphasis": true
+  },
+
+  "future_capabilities": {
+    "_note": "Architecture hooks for Phase 2",
+    "real_time_streaming": {
+      "enabled": false,
+      "provider": null
+    },
+    "voice_fine_tuning": {
+      "enabled": false,
+      "training_audio_samples": [],
+      "last_fine_tuned": null
+    },
+    "emotion_modulation": {
+      "enabled": false,
+      "emotions": ["warm", "focused", "concerned", "enthusiastic"]
+    }
+  },
+
+  "voice_library": [
+    {
+      "voice_id": "21m00Tcm4TlvDq8ikWAM",
+      "label": "Rachel (fallback)",
+      "is_cloned": false,
+      "active": true
+    }
+  ],
+
+  "training_metadata": {
+    "training_signals_enabled": false,
+    "last_training_session": null,
+    "audio_samples_collected": 0,
+    "quality_score": null
+  }
+}

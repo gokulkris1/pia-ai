@@ -1,0 +1,87 @@
+{
+  "_comment": "Avatar profile for the AI twin. Controls how the avatar looks and animates during calls.",
+
+  "user_id": "default",
+  "version": "1.0",
+  "last_updated": "2026-03-14",
+
+  "source": {
+    "type": "photo",
+    "file": "avatar.jpg",
+    "description": "Primary photo used as the AI twin's visual identity during calls",
+    "resolution_recommended": "512x512 or higher, square crop, face centred"
+  },
+
+  "display": {
+    "shape": "circle",
+    "border": true,
+    "border_color": "rgba(255,255,255,0.1)",
+    "size_desktop": 200,
+    "size_mobile": 160,
+    "object_position": "center top"
+  },
+
+  "idle_animation": {
+    "enabled": true,
+    "mode": "breathe",
+    "scale_min": 1.0,
+    "scale_max": 1.012,
+    "duration_seconds": 4,
+    "easing": "ease-in-out"
+  },
+
+  "speaking_animation": {
+    "enabled": true,
+    "mode": "audio_reactive",
+    "mouth_overlay": true,
+    "mouth_min_height_px": 2,
+    "mouth_max_height_px": 28,
+    "smoothing": 0.75,
+    "amplitude_threshold": 8,
+    "ripple_rings": 3,
+    "ring_color": "rgba(52, 199, 89, 0.35)"
+  },
+
+  "future_capabilities": {
+    "_note": "Architecture hooks for Phase 2 — none of these are active in MVP",
+    "facial_expression_mapping": {
+      "enabled": false,
+      "expressions": ["neutral", "smile", "concern", "focus", "surprise"],
+      "trigger_source": "llm_sentiment",
+      "model": null
+    },
+    "head_movement": {
+      "enabled": false,
+      "patterns": ["subtle_nod", "tilt_listening", "tilt_thinking"],
+      "trigger_source": "speech_phase",
+      "model": null
+    },
+    "micro_expressions": {
+      "enabled": false,
+      "model": null
+    },
+    "body_language": {
+      "enabled": false,
+      "mode": null,
+      "model": null
+    },
+    "lip_sync": {
+      "enabled": false,
+      "provider": null,
+      "latency_budget_ms": 100
+    },
+    "training_data": {
+      "video_samples": [],
+      "expression_labels": [],
+      "mannerism_logs": []
+    }
+  },
+
+  "training_metadata": {
+    "training_signals_enabled": false,
+    "last_training_session": null,
+    "photo_versions": [
+      { "file": "avatar.jpg", "added": "2026-03-14", "active": true }
+    ]
+  }
+}
