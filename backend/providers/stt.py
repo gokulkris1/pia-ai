@@ -18,9 +18,9 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> 
     Returns:
         Transcribed text string
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OpenAI_Key")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set in environment")
+        raise ValueError("OpenAI_Key is not set in environment")
 
     # Detect MIME type from filename extension
     ext = filename.rsplit(".", 1)[-1].lower()

@@ -2,11 +2,6 @@
   publish = "frontend"
   command = ""
 
-[build.environment]
-  PYTHON_VERSION = "3.11.8"
-  PIP_NO_BINARY = ""
-  SKIP_INSTALL = "true"
-
 # API calls are proxied to the FastAPI backend on Render.
 # Set BACKEND_URL in Netlify → Site settings → Environment variables.
 # Value should be your Render service URL, e.g. https://pia-backend.onrender.com
