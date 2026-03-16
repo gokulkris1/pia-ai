@@ -45,7 +45,7 @@ let lastTranscript = '';      // accumulated user speech this turn
 
 // TTS playback
 let audioEl = null;           // current <audio> element
-const avatar = new AvatarAnimator();
+const avatar = new RealisticAvatarAnimator();
 
 // MediaRecorder fallback (Whisper mode)
 let recorder = null;
