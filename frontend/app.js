@@ -34,6 +34,10 @@ let lastFrameB64 = null;      // last captured JPEG frame (for vision context)
 let frameInterval = null;     // frame-capture timer when back cam active
 const FRAME_INTERVAL_MS = 4000;  // capture back-cam frame every 4 s
 
+// Location & capabilities
+let lastLocation = null;      // { lat, lon, accuracy, timestamp }
+let locationWatchId = null;   // geolocation watch ID for continuous updates
+
 // STT
 let recognition = null;      // SpeechRecognition instance
 let silenceTimer = null;      // debounce: send after silence
@@ -107,16 +111,36 @@ async function startCall() {
     return;
   }
 
-  // Load avatar from localStorage (persists across sessions, works on Netlify)
-  const savedAvatar = localStorage.getItem('pia_avatar');
-  if (savedAvatar) {
-    document.querySelectorAll('#idle-photo, #call-photo').forEach(img => {
-      img.src = savedAvatar;
-    });
-    // Also update blurred background
+  // Request location permission (for weather, maps, location-aware responses)
+  requestLocation();
+
+  // Load avatar: localStorage (custom) → /avatar.jpg (default) → initials
+  const loadAvatar = () => {
+    const savedAvatar = localStorage.getItem('pia_avatar');
+    const avatarImgs = document.querySelectorAll('#idle-photo, #call-photo');
     const bgImg = document.querySelector('.idle-bg img');
-    if (bgImg) bgImg.src = savedAvatar;
-  }
+    const initials = document.getElementById('pia-initials');
+    
+    if (savedAvatar) {
+      // Custom photo from onboarding
+      avatarImgs.forEach(img => {
+        img.src = savedAvatar;
+        img.style.display = 'block';
+      });
+      if (bgImg) bgImg.src = savedAvatar;
+      if (initials) initials.style.opacity = '0';
+    } else {
+      // Try default /avatar.jpg
+      const defaultSrc = '/avatar.jpg';
+      avatarImgs.forEach(img => {
+        img.src = defaultSrc;
+        img.onload = () => { img.style.display = 'block'; if (initials) initials.style.opacity = '0'; };
+        img.onerror = () => { img.style.display = 'none'; if (initials) initials.style.opacity = '1'; };
+      });
+      if (bgImg) bgImg.src = defaultSrc;
+    }
+  };
+  loadAvatar();
 
   // Start front camera automatically (non-blocking)
   initUserCamera('user').catch(() => {});
@@ -158,6 +182,7 @@ async function endCall() {
   stopListening();
   stopAudio();
   stopCamera();
+  stopLocation();
   clearInterval(timerInterval);
 
   const duration = callStartTime ? formatTimer(Date.now() - callStartTime) : '00:00';
@@ -182,6 +207,7 @@ function resetToIdle() {
   lastTranscript = '';
   clearInterval(timerInterval);
   stopCamera();
+  stopLocation();
   updateTimer();   // reset to 00:00
   showScreen('screen-idle');
 }
@@ -302,6 +328,44 @@ function stopCamera() {
   clearInterval(frameInterval);
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   cameraOn = false; lastFrameB64 = null;
+}
+
+
+// ── Location & Capabilities ───────────────────────────────────────────────────
+
+function requestLocation() {
+  if (!navigator.geolocation) {
+    console.warn('[geo] Geolocation API not available');
+    return;
+  }
+  
+  // Request permission and start watching location
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      lastLocation = {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy),
+        timestamp: Date.now(),
+      };
+      console.log('[geo] Location:', lastLocation);
+    },
+    (err) => {
+      console.warn('[geo] Permission denied:', err.message);
+    },
+    {
+      enableHighAccuracy: false,
+      maximumAge: 30000,  // re-use cached location if < 30s old
+      timeout: 10000,
+    }
+  );
+}
+
+function stopLocation() {
+  if (locationWatchId !== null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
 }
 
 
@@ -429,12 +493,15 @@ async function processUserSpeech(text) {
   const frameForApi = camFacing === 'environment' ? (captureFrame() || lastFrameB64) : null;
 
   try {
-    // 1. Get LLM reply (optionally with visual frame for context)
-    const chatRes = await apiFetch('/api/chat', 'POST', {
+    // 1. Get LLM reply (optionally with visual frame + location for context)
+    const chatReq = {
       session_id:   sessionId,
       user_message: text,
-      ...(frameForApi ? { image_base64: frameForApi } : {}),
-    });
+    };
+    if (frameForApi) chatReq.image_base64 = frameForApi;
+    if (lastLocation) chatReq.location = lastLocation;
+    
+    const chatRes = await apiFetch('/api/chat', 'POST', chatReq);
 
     const reply = chatRes.reply;
     turnCount++;
@@ -567,8 +634,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('[stt] Web Speech API not available — will use Whisper via MediaRecorder');
   }
 
-  // Init avatar animator (loads config from /api/avatar/config)
-  await avatar.init();
+  // Init avatar animator (creates canvas-based talking head with lip sync)
+  await avatar.init('pia-main');
 
   // Restore saved avatar photo immediately (works even offline)
   const savedAvatar = localStorage.getItem('pia_avatar');
