@@ -8,6 +8,11 @@ import re
 import httpx
 
 
+def _env_value(name: str) -> str | None:
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
 def _clean_for_tts(text: str) -> str:
     """
     Pre-process text before sending to TTS so it reads naturally.
@@ -53,11 +58,11 @@ async def _call_elevenlabs(
     voice_id: str | None = None,
     settings_override: dict | None = None,
 ) -> bytes:
-    api_key = os.getenv("ELEVENLABS_API_KEY")
+    api_key = _env_value("ELEVENLABS_API_KEY")
     if not api_key:
         raise ValueError("ELEVENLABS_API_KEY is not set")
 
-    voice_id = voice_id or os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+    voice_id = voice_id or _env_value("ELEVENLABS_VOICE_ID") or "21m00Tcm4TlvDq8ikWAM"
 
     defaults = {
         "stability":         0.33,   # lower = more expressive/varied
@@ -94,7 +99,7 @@ async def _call_elevenlabs(
 # ── OpenAI TTS fallback ───────────────────────────────────────────────────────
 
 async def _call_openai_tts(text: str) -> bytes:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = _env_value("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set — cannot use TTS fallback")
 
@@ -136,7 +141,7 @@ async def clone_voice_elevenlabs(
     Returns:
         voice_id string if successful, None on failure
     """
-    api_key = os.getenv("ELEVENLABS_API_KEY")
+    api_key = _env_value("ELEVENLABS_API_KEY")
     if not api_key:
         print("[voice-clone] ELEVENLABS_API_KEY not set — skipping clone")
         return None

@@ -7,6 +7,11 @@ import os
 import httpx
 
 
+def _env_value(name: str) -> str | None:
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
 async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> str:
     """
     Transcribe audio using OpenAI Whisper API.
@@ -18,7 +23,7 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> 
     Returns:
         Transcribed text string
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = _env_value("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set in environment")
 

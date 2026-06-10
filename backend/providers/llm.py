@@ -13,6 +13,11 @@ from memory.manager import MemoryManager
 _FALLBACK_CHAIN = ["claude", "gpt4o", "gemini"]
 
 
+def _env_value(name: str) -> str | None:
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
 async def generate_response(
     user_message: str,
     persona: dict[str, Any],
@@ -66,7 +71,7 @@ async def generate_response(
 # ── Claude ────────────────────────────────────────────────────────────────────
 
 async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = _env_value("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY is not set in environment")
 
@@ -96,7 +101,7 @@ async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
 # ── GPT-4o ────────────────────────────────────────────────────────────────────
 
 async def _call_gpt4o(system_prompt: str, messages: list[dict]) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = _env_value("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set in environment")
 
@@ -126,7 +131,7 @@ async def _call_gpt4o(system_prompt: str, messages: list[dict]) -> str:
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
 async def _call_gemini(system_prompt: str, messages: list[dict]) -> str:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = _env_value("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY is not set in environment")
 

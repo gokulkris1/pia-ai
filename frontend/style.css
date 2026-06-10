@@ -26,6 +26,7 @@ html, body {
 }
 
 button { font: inherit; -webkit-tap-highlight-color: transparent; }
+input { font: inherit; }
 
 .app-shell {
   min-height: 100dvh;
@@ -159,6 +160,49 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.text-form {
+  width: min(520px, 92vw);
+  min-height: 46px;
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 8px;
+}
+
+.text-form[hidden] { display: none; }
+
+.text-input {
+  min-width: 0;
+  height: 44px;
+  border: 1px solid rgba(104, 230, 255, 0.22);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  outline: none;
+}
+
+.text-input:focus { border-color: rgba(104, 230, 255, 0.62); }
+.text-input::placeholder { color: rgba(244, 248, 251, 0.42); }
+
+.text-send {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(104, 230, 255, 0.26);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: rgba(104, 230, 255, 0.12);
+  cursor: pointer;
+}
+
+.text-send svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .dock {

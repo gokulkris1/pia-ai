@@ -53,6 +53,42 @@ async function toggleConversation() {
   if (state === 'speaking') stopAudio();
 }
 
+function toggleKeyboard() {
+  if (!els.textForm || !els.textInput) return;
+  const willOpen = els.textForm.hidden;
+  els.textForm.hidden = !willOpen;
+  if (willOpen) {
+    stopListening();
+    setState(sessionId ? 'idle' : 'connecting');
+    requestAnimationFrame(() => els.textInput?.focus());
+  }
+}
+
+async function ensureTextSession() {
+  if (sessionId) return;
+  const res = await apiFetch('/api/call/start', 'POST');
+  sessionId = res.session_id;
+}
+
+async function submitTypedMessage(event) {
+  event.preventDefault();
+  const text = els.textInput?.value.trim();
+  if (!text) return;
+  els.textInput.value = '';
+  stopListening();
+  stopAudio();
+
+  try {
+    await ensureTextSession();
+    await processUserSpeech(text, { resumeListening: false });
+    setState('idle');
+  } catch (err) {
+    console.error('[keyboard]', err);
+    setTranscript(err.message || 'Typed message failed.');
+    setState('alert');
+  }
+}
+
 async function startConversation() {
   setState('connecting');
   setTranscript('');
@@ -188,8 +224,9 @@ async function startWhisperTurn() {
   }
 }
 
-async function processUserSpeech(text) {
+async function processUserSpeech(text, options = {}) {
   if (!text?.trim() || !sessionId) return;
+  const resumeListening = options.resumeListening !== false;
   stopListening();
   setState('thinking');
   setTranscript(`You: ${text}`);
@@ -200,7 +237,7 @@ async function processUserSpeech(text) {
       user_message: text.trim(),
     });
     await piaSpeaks(chatRes.reply);
-    if (sessionId && state !== 'idle') startListening();
+    if (resumeListening && sessionId && state !== 'idle') startListening();
   } catch (err) {
     console.error('[chat]', err);
     setTranscript('Something went wrong. Tap to try again.');
@@ -267,9 +304,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   els.transcript = document.getElementById('transcript');
   els.micButton = document.getElementById('mic-button');
   els.endButton = document.getElementById('end-button');
+  els.keyboardButton = document.getElementById('keyboard-button');
+  els.textForm = document.getElementById('text-form');
+  els.textInput = document.getElementById('text-input');
 
   els.micButton?.addEventListener('click', toggleConversation);
   els.endButton?.addEventListener('click', endConversation);
+  els.keyboardButton?.addEventListener('click', toggleKeyboard);
+  els.textForm?.addEventListener('submit', submitTypedMessage);
 
   try {
     const health = await apiFetch('/api/health');

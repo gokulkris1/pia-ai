@@ -34,6 +34,12 @@
       <p id="status-subline" class="status-subline">pia is listening for you</p>
       <div id="model-pill" class="model-pill">claude · hardcoded</div>
       <div id="transcript" class="transcript" role="status"></div>
+      <form id="text-form" class="text-form" autocomplete="off" hidden>
+        <input id="text-input" class="text-input" type="text" name="message" aria-label="Type to Pia" placeholder="Ask Pia" />
+        <button class="text-send" type="submit" aria-label="Send typed message">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3 10.1l10.8 1.9L3 13.9l.4 6.5Z"/></svg>
+        </button>
+      </form>
     </section>
 
     <footer class="dock" aria-label="Voice controls">
