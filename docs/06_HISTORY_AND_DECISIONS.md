@@ -91,7 +91,7 @@ re-deriving it. Newest decisions at the bottom.
 - [x] Orb + voice spine implemented: the avatar/camera/restaurant paths are removed, the orb UI is wired to `/api/call/start`, `/api/chat`, and `/api/speak`, and the FastAPI app boots locally.
 - [ ] Voice round-trip with real STT/LLM/TTS keys — pending first browser test with valid environment variables.
 - [x] Calendar read code implemented: Google OAuth start/callback, ignored local token storage, `/api/calendar/status`, `/api/calendar/read`, and narrow `/api/chat` read intent are wired.
-- [ ] Calendar read OAuth/browser validation — pending Google OAuth credentials and founder account test.
+- [x] Calendar read OAuth/browser validation — local and deployed `hellopia` Cloud Run reads are verified against the founder's Google Calendar.
 - [ ] Calendar write — next Milestone 1 step; writes remain ask-first.
 
 ## Next action

@@ -30,6 +30,12 @@ APP_BASE_URL=https://pia-ai-REPLACE_WITH_FIREBASE_SITE.web.app
 GOOGLE_OAUTH_REDIRECT_URI=https://pia-backend-REPLACE_WITH_CLOUD_RUN_URL.a.run.app/api/calendar/callback
 ```
 
+Current `hellopia` Cloud Run backend:
+
+```text
+https://pia-backend-199710002148.europe-west2.run.app
+```
+
 The frontend reads `window.PIA_API_BASE` from `frontend/config.js`. For local FastAPI dev it
 uses same-origin (`''`). For hosted Firebase, replace the Cloud Run placeholder with the
 actual Cloud Run service URL.
