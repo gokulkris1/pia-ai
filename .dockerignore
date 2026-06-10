@@ -5,5 +5,7 @@ __pycache__
 *.pyc
 .env
 .env.*
+users/*/google_calendar_token.json
+users/*/pia_state.json
 .DS_Store
 node_modules

@@ -23,12 +23,11 @@ def load_credentials(project_root: Path, user_id: str, scopes: list[str]) -> Cre
     if token_json:
         try:
             token_info = json.loads(token_json)
-            if not _has_required_scopes(token_info, scopes):
-                return None
-            return Credentials.from_authorized_user_info(token_info, scopes=scopes)
+            if _has_required_scopes(token_info, scopes):
+                return Credentials.from_authorized_user_info(token_info, scopes=scopes)
+            print(f"[calendar] {TOKEN_ENV} does not include the required scopes; checking token file")
         except Exception as err:
             print(f"[calendar] Failed to load {TOKEN_ENV}: {err}")
-            return None
 
     path = token_path(project_root, user_id)
     if not path.exists():
