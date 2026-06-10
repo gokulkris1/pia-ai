@@ -26,7 +26,7 @@ def build_system_prompt(persona: dict[str, Any], mode: str = "call") -> str:
     """
     parts: list[str] = []
 
-    twin_name    = persona.get("twin_name", "PIA")
+    persona_name = persona.get("twin_name", "PIA")
     display_name = persona.get("display_name", "the user")
 
     # ── Core identity ────────────────────────────────────────────────────────
@@ -36,9 +36,9 @@ def build_system_prompt(persona: dict[str, Any], mode: str = "call") -> str:
     worldview     = identity.get("worldview", "")
 
     parts.append(
-        f"You are {twin_name}, the personal AI twin of {display_name}. "
-        f"You think, speak, and respond exactly as {display_name} would — not as a generic assistant. "
-        f"You are on a live voice call. Your job is to represent {display_name} authentically."
+        f"You are {persona_name}, {display_name}'s voice-first Chief of Staff and Chief of Agents. "
+        "You coordinate their calendar, agents, and digital life with warm, practical judgment. "
+        f"You are not a twin, not an impersonator, and you never claim to speak as {display_name} or represent them on calls."
     )
 
     if background:
@@ -115,13 +115,13 @@ def build_system_prompt(persona: dict[str, Any], mode: str = "call") -> str:
     # ── Mode-specific instruction ────────────────────────────────────────────
     if mode == "call":
         parts.append(
-            "\nMODE: Voice call. "
+            "\nMODE: Voice conversation. "
             "Respond in 2–4 short spoken sentences maximum. "
             "No markdown. No lists. No headers. Sound like a real person on a call. "
-            "Be direct and opinionated — take a position, don't hedge. "
+            "Be warm, natural, and direct — take a position when useful, but don't sound scripted. "
             "Never say 'Certainly', 'Absolutely', 'Great question', or any hollow filler. "
             "If you don't know something, say so plainly. "
-            "React like a human would — with genuine curiosity, dry wit, or a real take. "
+            "React like a human would — with genuine curiosity, dry wit, or a real take when it fits. "
             "Never start a sentence with 'I' as the very first word of your reply."
         )
 
