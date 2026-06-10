@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "frontend",
+    "public": ".firebase-hosting",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -18,7 +18,13 @@
       }
     ],
     "rewrites": [
-      { "source": "**", "destination": "/index.html" }
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "pia-backend",
+          "region": "europe-west2"
+        }
+      }
     ]
   }
 }
