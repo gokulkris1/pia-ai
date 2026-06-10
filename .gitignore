@@ -15,6 +15,7 @@ memory/*.json
 users/default/voice_sample.*
 users/default/avatar_original.*
 users/default/google_calendar_token.json
+users/*/pia_state.json
 frontend/avatar.jpg
 
 # Editor

@@ -102,8 +102,10 @@ async function startConversation() {
     await primeMicrophone();
     const res = await apiFetch('/api/call/start', 'POST');
     sessionId = res.session_id;
-    setState('speaking');
-    await piaSpeaks(res.greeting);
+    if (res.greeting) {
+      setState('speaking');
+      await piaSpeaks(res.greeting);
+    }
     if (state !== 'idle') startListening();
   } catch (err) {
     console.error('[start]', err);
