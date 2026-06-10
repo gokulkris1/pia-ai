@@ -7,5 +7,5 @@ jobs:
   noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Manual GCP deploy only
-        run: echo "Automatic Netlify deploy is disabled. Milestone 1 deploys manually to Cloud Run + Firebase Hosting."
+      - name: Manual GCP/Firebase deploy only
+        run: echo "Automatic legacy deploys are disabled. Production deploys to Cloud Run + Firebase Hosting."
