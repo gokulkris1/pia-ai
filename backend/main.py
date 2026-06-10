@@ -122,7 +122,7 @@ class StartCallResponse(BaseModel):
 async def health():
     return {
         "status":   "ok",
-        "twin":     USER_PROFILE.twin_name,
+        "persona":  USER_PROFILE.persona_name,
         "user":     USER_PROFILE.display_name,
         "user_id":  USER_PROFILE.user_id,
     }
@@ -253,7 +253,7 @@ async def start_call():
     return StartCallResponse(
         session_id=session_id,
         greeting=greeting,
-        persona_name=profile.twin_name,
+        persona_name=profile.persona_name,
     )
 
 

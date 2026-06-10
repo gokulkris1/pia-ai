@@ -31,15 +31,15 @@ class UserProfile:
         return self.persona.get("display_name", self.user_id)
 
     @property
-    def twin_name(self) -> str:
-        return self.persona.get("twin_name", "PIA")
+    def persona_name(self) -> str:
+        return self.persona.get("persona_name", "PIA")
 
     @property
     def active_voice_id(self) -> str:
         return self.voice.get("active_voice", {}).get("voice_id", "21m00Tcm4TlvDq8ikWAM")
 
     def __repr__(self) -> str:
-        return f"UserProfile(id={self.user_id!r}, persona={self.twin_name!r})"
+        return f"UserProfile(id={self.user_id!r}, persona={self.persona_name!r})"
 
 
 def load_user_profile(user_id: str = "default") -> UserProfile:
@@ -63,7 +63,7 @@ def load_user_profile(user_id: str = "default") -> UserProfile:
     voice   = _load_json(user_dir / "voice.json",   _default_voice())
 
     profile = UserProfile(user_id=user_id, persona=persona, voice=voice, _root=user_dir)
-    print(f"[users] Loaded profile for '{profile.display_name}' (persona: {profile.twin_name})")
+    print(f"[users] Loaded profile for '{profile.display_name}' (persona: {profile.persona_name})")
     return profile
 
 
@@ -98,7 +98,7 @@ def _default_profile(user_id: str) -> UserProfile:
 def _default_persona() -> dict:
     return {
         "display_name": "User",
-        "twin_name":    "PIA",
+        "persona_name": "PIA",
         "greeting":     "Hey, I'm Pia \u2014 your Chief of Staff for calendar, agents, and digital life. What should we sort out first?",
         "speaking_style": {"preferred_response_length": "2\u20134 sentences"},
         "rules": [

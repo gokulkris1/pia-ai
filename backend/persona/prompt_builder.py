@@ -26,7 +26,7 @@ def build_system_prompt(persona: dict[str, Any], mode: str = "call") -> str:
     """
     parts: list[str] = []
 
-    persona_name = persona.get("twin_name", "PIA")
+    persona_name = persona.get("persona_name", "PIA")
     display_name = persona.get("display_name", "the user")
 
     # ── Core identity ────────────────────────────────────────────────────────
