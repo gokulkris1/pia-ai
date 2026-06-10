@@ -1,5 +1,5 @@
 """
-LLM Provider — Claude (claude-sonnet-4-6) or GPT-4o
+LLM Provider — Claude → GPT-4o → Gemini fallback chain.
 Injects persona system prompt, uses memory for context.
 """
 
@@ -9,6 +9,9 @@ from typing import Any
 
 from memory.manager import MemoryManager
 
+# Fallback order when a provider fails or has no key
+_FALLBACK_CHAIN = ["claude", "gpt4o", "gemini"]
+
 
 async def generate_response(
     user_message: str,
@@ -16,7 +19,6 @@ async def generate_response(
     memory: MemoryManager,
     engine: str | None = None,
     system_prompt_override: str | None = None,
-    image_base64: str | None = None,
 ) -> str:
     """
     Generate a persona-aware AI reply.
@@ -25,34 +27,40 @@ async def generate_response(
         user_message:           what the user just said
         persona:                loaded persona dict
         memory:                 conversation memory for this session
-        engine:                 'claude' | 'gpt4o'  (defaults to LLM_ENGINE env var)
+        engine:                 'claude' | 'gpt4o' | 'gemini'  (defaults to LLM_ENGINE env var)
         system_prompt_override: if provided, replaces the auto-built prompt
-        image_base64:           optional JPEG frame from back camera for visual context
 
     Returns:
         Reply text string
     """
-    engine = engine or os.getenv("LLM_ENGINE", "claude")
+    engine = engine or os.getenv("LLM_ENGINE", "gpt4o")
 
     if system_prompt_override:
         system_prompt = system_prompt_override
     else:
-        # Fallback: build a minimal prompt from persona dict
         from persona.prompt_builder import build_system_prompt
         system_prompt = build_system_prompt(persona)
 
     messages = memory.get_messages() + [{"role": "user", "content": user_message}]
 
-    if engine == "claude":
+    # Build the ordered list of providers to try, starting from the requested engine.
+    start = _FALLBACK_CHAIN.index(engine) if engine in _FALLBACK_CHAIN else 0
+    providers = _FALLBACK_CHAIN[start:]
+
+    last_err: Exception | None = None
+    for provider in providers:
         try:
-            return await _call_claude(system_prompt, messages)
-        except Exception as claude_err:
-            print(f"[llm] Claude failed ({claude_err}) — falling back to GPT-4o")
-            return await _call_gpt4o(system_prompt, messages, image_base64=image_base64)
-    elif engine == "gpt4o":
-        return await _call_gpt4o(system_prompt, messages, image_base64=image_base64)
-    else:
-        raise ValueError(f"Unknown LLM engine '{engine}'. Use 'claude' or 'gpt4o'.")
+            if provider == "claude":
+                return await _call_claude(system_prompt, messages)
+            elif provider == "gpt4o":
+                return await _call_gpt4o(system_prompt, messages)
+            elif provider == "gemini":
+                return await _call_gemini(system_prompt, messages)
+        except Exception as err:
+            print(f"[llm] {provider} failed ({err}) — trying next provider")
+            last_err = err
+
+    raise RuntimeError(f"All LLM providers failed. Last error: {last_err}")
 
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -87,36 +95,12 @@ async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
 
 # ── GPT-4o ────────────────────────────────────────────────────────────────────
 
-async def _call_gpt4o(system_prompt: str, messages: list[dict], image_base64: str | None = None) -> str:
+async def _call_gpt4o(system_prompt: str, messages: list[dict]) -> str:
     api_key = os.getenv("OpenAI_Key")
     if not api_key:
         raise ValueError("OpenAI_Key is not set in environment")
 
-    # If an image frame is present, inject it into the last user message as vision content
-    if image_base64:
-        gpt_messages: list[dict] = []
-        for i, m in enumerate(messages):
-            if i == len(messages) - 1 and m["role"] == "user":
-                # Vision-capable content block — back camera: "here's what I'm looking at"
-                gpt_messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": m["content"]},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url":    f"data:image/jpeg;base64,{image_base64}",
-                                "detail": "low",   # 'low' = faster + cheaper, enough for context
-                            },
-                        },
-                    ],
-                })
-            else:
-                gpt_messages.append(m)
-    else:
-        gpt_messages = messages
-
-    full_messages = [{"role": "system", "content": system_prompt}] + gpt_messages
+    full_messages = [{"role": "system", "content": system_prompt}] + messages
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
@@ -137,3 +121,35 @@ async def _call_gpt4o(system_prompt: str, messages: list[dict], image_base64: st
 
     data = resp.json()
     return data["choices"][0]["message"]["content"].strip()
+
+
+# ── Gemini ────────────────────────────────────────────────────────────────────
+
+async def _call_gemini(system_prompt: str, messages: list[dict]) -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is not set in environment")
+
+    # Convert messages to Gemini's `contents` format (alternating user/model turns)
+    contents: list[dict] = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 300, "temperature": 0.7},
+    }
+
+    model = "gemini-2.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(url, json=payload, headers={"content-type": "application/json"})
+
+    if resp.status_code != 200:
+        raise ValueError(f"Gemini API error {resp.status_code}: {resp.text}")
+
+    data = resp.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"].strip()

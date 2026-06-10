@@ -6,7 +6,6 @@ Run: uvicorn main:app --reload --port 8000
 
 import os
 import uuid
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -27,10 +26,9 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 from providers.stt import transcribe_audio
 from providers.llm import generate_response
-from providers.tts import synthesize_speech, clone_voice_elevenlabs
+from providers.tts import synthesize_speech
 from users.loader import load_user_profile, list_users
 from persona.prompt_builder import build_system_prompt
-from avatar.config import get_avatar_config
 from memory.manager import MemoryManager
 from session.call import CallSession
 
@@ -61,7 +59,6 @@ PERSONA = USER_PROFILE.persona
 class ChatRequest(BaseModel):
     session_id: str
     user_message: str
-    image_base64: str | None = None   # optional JPEG frame from back camera (vision context)
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -71,133 +68,11 @@ class SpeakRequest(BaseModel):
     text: str
     voice_id: str | None = None
 
+
 class StartCallResponse(BaseModel):
     session_id: str
     greeting: str
     persona_name: str
-
-class OnboardProfile(BaseModel):
-    name: str
-    tagline: str = ""
-    tone: str = "warm-but-direct"
-    humor: str = "dry, understated"
-    response_length: str = "2-4 sentences maximum"
-
-
-# ── Onboarding routes ────────────────────────────────────────────────────────
-
-@app.get("/api/onboard/status")
-async def onboard_status():
-    """Check if the user has completed onboarding."""
-    persona_path = PROJECT_ROOT / "users" / DEFAULT_USER_ID / "persona.json"
-    if persona_path.exists():
-        data = json.loads(persona_path.read_text())
-        return {"onboarded": data.get("onboarded", False), "name": data.get("display_name", "")}
-    return {"onboarded": False, "name": ""}
-
-
-@app.post("/api/onboard/profile")
-async def save_onboard_profile(data: OnboardProfile):
-    """Write user profile from onboarding wizard to persona.json."""
-    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
-    user_dir.mkdir(parents=True, exist_ok=True)
-    persona_path = user_dir / "persona.json"
-
-    # Load existing as base (keep all the AI rules/defaults)
-    existing = {}
-    if persona_path.exists():
-        existing = json.loads(persona_path.read_text())
-
-    # Patch with onboarding data
-    existing["onboarded"]    = True
-    existing["display_name"] = data.name
-    existing["twin_name"]    = "Pia"
-    existing["last_updated"] = datetime.now().strftime("%Y-%m-%d")
-    existing["greeting"]     = f"Hey, I'm Pia \u2014 {data.name}'s AI twin. You can call me Pia, or rename me to whatever you'd like in settings. How's your day going? Anything on your mind?"
-
-    if "identity" not in existing:
-        existing["identity"] = {}
-    existing["identity"]["background"] = data.tagline
-
-    if "speaking_style" not in existing:
-        existing["speaking_style"] = {}
-    existing["speaking_style"]["tone"]                      = data.tone
-    existing["speaking_style"]["preferred_response_length"] = data.response_length
-
-    if "humor" not in existing:
-        existing["humor"] = {}
-    existing["humor"]["style"] = data.humor
-
-    persona_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
-
-    # Hot-reload global profile so next call uses new persona immediately
-    global USER_PROFILE, PERSONA
-    USER_PROFILE = load_user_profile(DEFAULT_USER_ID)
-    PERSONA      = USER_PROFILE.persona
-
-    print(f"[onboard] Profile saved for '{data.name}'")
-    return {"status": "saved", "name": data.name}
-
-
-@app.post("/api/onboard/voice-sample")
-async def save_voice_sample(file: UploadFile = File(...)):
-    """Store and clone the user's voice via ElevenLabs."""
-    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
-    user_dir.mkdir(parents=True, exist_ok=True)
-
-    content   = await file.read()
-    mime_type = file.content_type or "audio/webm"
-
-    # Persist the raw sample
-    ext       = mime_type.split("/")[-1].split(";")[0] or "webm"
-    out_path  = user_dir / f"voice_sample.{ext}"
-    out_path.write_bytes(content)
-    print(f"[onboard] Voice sample saved ({len(content):,} bytes, {mime_type})")
-
-    # Try to clone via ElevenLabs
-    profile    = load_user_profile(DEFAULT_USER_ID)
-    voice_name = f"{profile.display_name}'s Pia"
-    voice_id   = await clone_voice_elevenlabs(content, voice_name, mime_type)
-
-    if voice_id:
-        # Update voice.json so future TTS calls use the cloned voice
-        voice_path = user_dir / "voice.json"
-        try:
-            voice_data = json.loads(voice_path.read_text()) if voice_path.exists() else {}
-        except Exception:
-            voice_data = {}
-
-        voice_data.setdefault("active_voice", {})
-        voice_data["active_voice"]["voice_id"]   = voice_id
-        voice_data["active_voice"]["voice_name"]  = voice_name
-        voice_data["active_voice"]["is_cloned"]   = True
-        voice_data["active_voice"]["cloned_at"]   = datetime.utcnow().isoformat()
-        voice_path.write_text(json.dumps(voice_data, indent=2))
-        print(f"[onboard] voice.json updated with cloned voice_id={voice_id}")
-        return {"status": "cloned", "voice_id": voice_id, "bytes": len(content)}
-
-    return {"status": "saved", "voice_id": None, "bytes": len(content)}
-
-
-@app.post("/api/onboard/photo")
-async def save_onboard_photo(file: UploadFile = File(...)):
-    """Save user photo as frontend avatar (served as /static/avatar.jpg)."""
-    content = await file.read()
-    # Serve from frontend/ so it's picked up by StaticFiles
-    avatar_path = FRONTEND_DIR / "avatar.jpg"
-    avatar_path.write_bytes(content)
-    # Also keep a backup in the user folder
-    user_dir = PROJECT_ROOT / "users" / DEFAULT_USER_ID
-    user_dir.mkdir(parents=True, exist_ok=True)
-    (user_dir / "avatar_original.jpg").write_bytes(content)
-    print(f"[onboard] Photo saved ({len(content):,} bytes)")
-    return {"status": "saved"}
-
-
-@app.get("/onboard")
-async def serve_onboard():
-    """Serve the onboarding wizard page."""
-    return FileResponse(str(FRONTEND_DIR / "onboard.html"))
 
 
 # ── API routes ────────────────────────────────────────────────────────────────
@@ -216,14 +91,6 @@ async def health():
 async def get_users():
     """List all configured user profiles."""
     return {"users": list_users(), "active": DEFAULT_USER_ID}
-
-
-@app.get("/api/avatar/config")
-async def avatar_config():
-    """Return avatar animation config for the active user — consumed by frontend."""
-    # Re-read profile so changes to avatar.json are picked up without restart
-    profile = load_user_profile(DEFAULT_USER_ID)
-    return get_avatar_config(profile.avatar)
 
 
 @app.post("/api/call/start", response_model=StartCallResponse)
@@ -319,7 +186,6 @@ async def chat(req: ChatRequest):
         persona=profile.persona,
         memory=session.memory,
         system_prompt_override=system_prompt,
-        image_base64=req.image_base64,
     )
 
     # Persist to memory
@@ -361,6 +227,10 @@ if FRONTEND_DIR.exists():
     @app.get("/")
     async def root():
         return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+    @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+    async def api_not_found(path: str):
+        raise HTTPException(status_code=404, detail=f"API route not found: /api/{path}")
 
     @app.get("/{path:path}")
     async def spa_fallback(path: str):
