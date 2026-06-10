@@ -20,7 +20,11 @@ class CalendarNotConnectedError(RuntimeError):
 
 
 def get_redirect_uri() -> str:
-    return os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8000/api/calendar/callback")
+    return (
+        os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+        or os.getenv("GOOGLE_REDIRECT_URI")
+        or "http://localhost:8000/api/calendar/callback"
+    )
 
 
 def build_auth_flow() -> Flow:
