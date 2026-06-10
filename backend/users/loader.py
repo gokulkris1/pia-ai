@@ -1,12 +1,11 @@
 """
-User Profile Loader — loads the full twin profile for a given user.
-Combines persona.json, avatar.json, voice.json into a single UserProfile.
+User Profile Loader — loads the founder profile for Pia.
+Combines persona.json and voice.json into a single UserProfile.
 
 Usage:
     from users.loader import load_user_profile
     profile = load_user_profile("default")
     profile.persona    # dict from persona.json
-    profile.avatar     # dict from avatar.json
     profile.voice      # dict from voice.json
 """
 
@@ -24,7 +23,6 @@ USERS_DIR    = PROJECT_ROOT / "users"
 class UserProfile:
     user_id:  str
     persona:  dict[str, Any]
-    avatar:   dict[str, Any]
     voice:    dict[str, Any]
     _root:    Path = field(repr=False, default=None)
 
@@ -40,20 +38,6 @@ class UserProfile:
     def active_voice_id(self) -> str:
         return self.voice.get("active_voice", {}).get("voice_id", "21m00Tcm4TlvDq8ikWAM")
 
-    @property
-    def avatar_photo_path(self) -> Path | None:
-        """Returns absolute path to the avatar photo, or None if not found."""
-        photo = self.avatar.get("source", {}).get("file", "avatar.jpg")
-        # Check frontend/ first (where the web server serves it from), then user dir
-        candidates = [
-            PROJECT_ROOT / "frontend" / photo,
-            self._root / photo,
-        ]
-        for p in candidates:
-            if p.exists():
-                return p
-        return None
-
     def __repr__(self) -> str:
         return f"UserProfile(id={self.user_id!r}, twin={self.twin_name!r})"
 
@@ -66,7 +50,7 @@ def load_user_profile(user_id: str = "default") -> UserProfile:
         user_id: folder name under users/  (default: "default")
 
     Returns:
-        UserProfile with .persona, .avatar, .voice populated.
+        UserProfile with .persona and .voice populated.
         Falls back to safe defaults if any file is missing.
     """
     user_dir = USERS_DIR / user_id
@@ -76,10 +60,9 @@ def load_user_profile(user_id: str = "default") -> UserProfile:
         return _default_profile(user_id)
 
     persona = _load_json(user_dir / "persona.json", _default_persona())
-    avatar  = _load_json(user_dir / "avatar.json",  _default_avatar())
     voice   = _load_json(user_dir / "voice.json",   _default_voice())
 
-    profile = UserProfile(user_id=user_id, persona=persona, avatar=avatar, voice=voice, _root=user_dir)
+    profile = UserProfile(user_id=user_id, persona=persona, voice=voice, _root=user_dir)
     print(f"[users] Loaded profile for '{profile.display_name}' (twin: {profile.twin_name})")
     return profile
 
@@ -108,7 +91,6 @@ def _default_profile(user_id: str) -> UserProfile:
     return UserProfile(
         user_id=user_id,
         persona=_default_persona(),
-        avatar=_default_avatar(),
         voice=_default_voice(),
     )
 
@@ -129,14 +111,6 @@ def _default_persona() -> dict:
         ],
         "typical_phrases": [],
         "dislikes_in_ai_responses": ["Certainly!", "Great question!"],
-    }
-
-
-def _default_avatar() -> dict:
-    return {
-        "source": {"type": "photo", "file": "avatar.jpg"},
-        "idle_animation": {"enabled": True, "mode": "breathe"},
-        "speaking_animation": {"enabled": True, "mode": "audio_reactive"},
     }
 
 

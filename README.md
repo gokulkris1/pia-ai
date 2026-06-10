@@ -1,42 +1,23 @@
-# pia
+# Pia
 
-Personal ambient AI assistant. Voice-first, mobile-ready, engine-switchable.
+Pia is a voice-first personal AI chief-of-staff for the founder as user zero.
 
-## features
-- voice input (Web Speech API) + text-to-speech output
-- switchable AI engine: Claude (Anthropic) or GPT-4o (OpenAI)
-- skills: weather, reminders, web search, summarizer, notes
-- conversation memory
-- PWA — install on any phone from the browser
+## Milestone 1
 
-## deploy
+Build only the spine:
 
-Hosted on Netlify. Connect this repo and it auto-deploys on every push.
-
-### environment variables (set in Netlify dashboard)
-
-| variable | description |
-|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key (for Claude) |
-| `OPENAI_API_KEY` | OpenAI API key (for GPT-4o) |
-
-Users can also enter their own API keys directly in the app settings.
-
-## structure
-
-```
-pia-ai/
-├── index.html                    # main app (single file)
-├── manifest.json                 # PWA manifest
-├── netlify.toml                  # Netlify config + headers
-└── netlify/
-    └── functions/
-        └── ai-proxy.mjs          # serverless proxy (bypasses CORS)
+```text
+tap orb -> speech-to-text -> Claude -> calendar intent -> Google Calendar read/write
+(ask-first for writes) -> text-to-speech -> orb animates while speaking
 ```
 
-## local dev
+No second agent, no model router, no autonomous mode, and no avatar.
 
-```bash
-npm install -g netlify-cli
-netlify dev
-```
+## Stack
+
+- Frontend: vanilla JS static app in `frontend/`, hosted on Firebase Hosting.
+- Backend: existing FastAPI app in `backend/`, containerized for Cloud Run.
+- STT/TTS: Whisper/OpenAI transcription fallback and ElevenLabs speech.
+- LLM: Claude for M1 (`LLM_ENGINE=claude`).
+
+Read `docs/README.md` first; the full build order and constraints live in `docs/`.

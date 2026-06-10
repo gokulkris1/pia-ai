@@ -28,16 +28,9 @@ source "$VENV/bin/activate"
 
 # ── 3. Install dependencies ───────────────────────────────────────────────────
 echo "📦  Installing dependencies…"
-pip install -q -r "$ROOT/requirements.txt"
+pip install -q -r "$BACKEND/requirements.txt"
 
-# ── 4. Add avatar placeholder if needed ──────────────────────────────────────
-AVATAR="$ROOT/frontend/avatar.jpg"
-if [ ! -f "$AVATAR" ]; then
-  echo "🖼  No avatar.jpg found in frontend/ — using initials placeholder."
-  echo "    To add your photo: drop avatar.jpg into the frontend/ folder."
-fi
-
-# ── 5. Launch server ──────────────────────────────────────────────────────────
+# ── 4. Launch server ──────────────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🟢  PIA is starting…"
