@@ -70,6 +70,12 @@ re-deriving it. Newest decisions at the bottom.
    for Cloud Run. Host the static frontend on Firebase Hosting. Do not rewrite the backend
    into another framework. (See `07_DEPLOYMENT.md`.)
 
+12. **Conversation/session naming.** The inherited `/api/call/start`, `/api/call/end`, and
+   `session/call.py` machinery now represent conversation state, not a twin-era phone-call
+   UI. Keep the names through M1 because the flow works and renaming would add risk before
+   calendar. Rename to agent-neutral conversation/session naming after the calendar read/write
+   spine is working.
+
 ## Working agreement
 
 - Human does: domains, Google Cloud OAuth, Cloud Run/Firebase env vars, testing on real
@@ -82,10 +88,13 @@ re-deriving it. Newest decisions at the bottom.
 - [x] Vision, architecture, design spec, build order agreed.
 - [x] Orb visual direction locked (holographic, volumetric, audio-reactive, 4 states).
 - [x] Home screen layout locked (flex column, mic-hero dock, ghost keyboard).
-- [ ] Milestone 1 implementation — NOT STARTED. This doc package is the handoff to begin it.
+- [x] Orb + voice spine implemented: the avatar/camera/restaurant paths are removed, the orb UI is wired to `/api/call/start`, `/api/chat`, and `/api/speak`, and the FastAPI app boots locally.
+- [ ] Voice round-trip with real STT/LLM/TTS keys — pending first browser test with valid environment variables.
+- [x] Calendar read code implemented: Google OAuth start/callback, ignored local token storage, `/api/calendar/status`, `/api/calendar/read`, and narrow `/api/chat` read intent are wired.
+- [ ] Calendar read OAuth/browser validation — pending Google OAuth credentials and founder account test.
+- [ ] Calendar write — next Milestone 1 step; writes remain ask-first.
 
 ## Next action
 
-Paste `00_GRAND_PROMPT.md` into the coding agent, ensure it reads all of `/docs`, get its
-file-by-file plan for Milestone 1, approve, then build voice-loop → calendar-read →
-calendar-write(ask-first).
+Run the first voice-loop + calendar-read test with real keys and Google OAuth credentials,
+then build calendar-write (ask-first).

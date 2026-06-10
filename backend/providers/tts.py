@@ -94,9 +94,9 @@ async def _call_elevenlabs(
 # ── OpenAI TTS fallback ───────────────────────────────────────────────────────
 
 async def _call_openai_tts(text: str) -> bytes:
-    api_key = os.getenv("OpenAI_Key")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OpenAI_Key is not set — cannot use TTS fallback")
+        raise ValueError("OPENAI_API_KEY is not set — cannot use TTS fallback")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(

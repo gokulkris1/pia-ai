@@ -24,11 +24,11 @@ beside them.
 
 ```text
 # LLM: Claude hardcoded for M1
-calude_key=
+ANTHROPIC_API_KEY=
 LLM_ENGINE=claude
 
 # STT: Whisper via OpenAI
-OpenAI_Key=
+OPENAI_API_KEY=
 
 # TTS: ElevenLabs
 ELEVENLABS_API_KEY=
@@ -38,6 +38,9 @@ ELEVENLABS_VOICE_ID=
 GOOGLE_OAUTH_CLIENT_ID=
 GOOGLE_OAUTH_CLIENT_SECRET=
 GOOGLE_OAUTH_REDIRECT_URI=https://pia-backend-REPLACE_WITH_CLOUD_RUN_URL.a.run.app/api/calendar/callback
+GOOGLE_CALENDAR_TOKEN_JSON=      # optional token JSON for deployed Cloud Run
+GOOGLE_CALENDAR_TOKEN_PATH=      # optional local token file path override
+PIA_TIMEZONE=Europe/Dublin
 
 # App
 APP_BASE_URL=https://pia-ai-REPLACE_WITH_FIREBASE_SITE.web.app
@@ -47,6 +50,11 @@ PIA_USER_ID=default
 
 Never commit real secrets. Local `.env` is ignored; Cloud Run should receive production
 secrets via env vars or Secret Manager-backed env vars.
+
+For local OAuth testing, the callback stores the token at
+`users/default/google_calendar_token.json`, which is ignored by git. For Cloud Run, prefer
+setting `GOOGLE_CALENDAR_TOKEN_JSON` or Secret Manager-backed env vars after the first OAuth
+connection so token persistence does not depend on container filesystem lifetime.
 
 ## Repo layout
 

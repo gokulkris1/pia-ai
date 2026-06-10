@@ -9,9 +9,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -31,6 +31,16 @@ from users.loader import load_user_profile, list_users
 from persona.prompt_builder import build_system_prompt
 from memory.manager import MemoryManager
 from session.call import CallSession
+from calendar_agent.google_client import (
+    CalendarNotConnectedError,
+    exchange_code,
+    format_events_for_voice,
+    get_authorization_url,
+    read_events,
+)
+from calendar_agent.intent import get_time_window, is_calendar_read_intent
+from calendar_agent.store import has_credentials
+from calendar_agent.google_client import SCOPES
 
 app = FastAPI(title="PIA Backend", version="1.0.0")
 
@@ -69,6 +79,18 @@ class SpeakRequest(BaseModel):
     voice_id: str | None = None
 
 
+class CalendarStatusResponse(BaseModel):
+    connected: bool
+    auth_url: str
+
+
+class CalendarReadResponse(BaseModel):
+    connected: bool
+    label: str
+    events: list[dict]
+    reply: str
+
+
 class StartCallResponse(BaseModel):
     session_id: str
     greeting: str
@@ -91,6 +113,67 @@ async def health():
 async def get_users():
     """List all configured user profiles."""
     return {"users": list_users(), "active": DEFAULT_USER_ID}
+
+
+@app.get("/api/calendar/auth")
+async def calendar_auth():
+    """Start Google Calendar OAuth."""
+    try:
+        return RedirectResponse(get_authorization_url())
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+
+
+@app.get("/api/calendar/callback")
+async def calendar_callback(code: str | None = None, error: str | None = None):
+    """Google OAuth callback: store the founder's calendar token."""
+    if error:
+        raise HTTPException(status_code=400, detail=f"Google OAuth failed: {error}")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing Google OAuth code")
+
+    try:
+        exchange_code(PROJECT_ROOT, DEFAULT_USER_ID, code)
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+
+    return HTMLResponse(
+        "<html><body><h1>Calendar connected</h1>"
+        "<p>Pia can now read your calendar. You can close this tab.</p></body></html>"
+    )
+
+
+@app.get("/api/calendar/status", response_model=CalendarStatusResponse)
+async def calendar_status():
+    """Return whether Google Calendar is connected for the active founder profile."""
+    return CalendarStatusResponse(
+        connected=has_credentials(PROJECT_ROOT, DEFAULT_USER_ID, SCOPES),
+        auth_url="/api/calendar/auth",
+    )
+
+
+@app.get("/api/calendar/read", response_model=CalendarReadResponse)
+async def calendar_read(q: str = Query("what's on my calendar tomorrow")):
+    """Read calendar events for a narrow natural-language time window."""
+    timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
+    start, end, label = get_time_window(q, timezone_name)
+
+    try:
+        events = read_events(PROJECT_ROOT, DEFAULT_USER_ID, start, end)
+    except CalendarNotConnectedError:
+        return CalendarReadResponse(
+            connected=False,
+            label=label,
+            events=[],
+            reply="Calendar is not connected yet. Open /api/calendar/auth first, then ask me again.",
+        )
+
+    return CalendarReadResponse(
+        connected=True,
+        label=label,
+        events=events,
+        reply=format_events_for_voice(events, label),
+    )
 
 
 @app.post("/api/call/start", response_model=StartCallResponse)
@@ -180,6 +263,20 @@ async def chat(req: ChatRequest):
     # Re-read persona so live edits to persona.json take effect without restart
     profile       = load_user_profile(DEFAULT_USER_ID)
     system_prompt = build_system_prompt(profile.persona, mode="call")
+
+    if is_calendar_read_intent(req.user_message):
+        timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
+        start, end, label = get_time_window(req.user_message, timezone_name)
+        try:
+            events = read_events(PROJECT_ROOT, DEFAULT_USER_ID, start, end)
+            reply = format_events_for_voice(events, label)
+        except CalendarNotConnectedError:
+            reply = "Calendar is not connected yet. Open the calendar connect link at /api/calendar/auth, then ask me again."
+
+        session.memory.add("user", req.user_message)
+        session.memory.add("assistant", reply)
+        session.record_turn()
+        return ChatResponse(session_id=req.session_id, reply=reply)
 
     reply = await generate_response(
         user_message=req.user_message,

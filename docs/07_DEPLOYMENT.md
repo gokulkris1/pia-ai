@@ -43,12 +43,17 @@ gcloud run deploy pia-backend \
   --source . \
   --region REPLACE_WITH_REGION \
   --allow-unauthenticated \
-  --set-env-vars LLM_ENGINE=claude,PIA_USER_ID=default
+  --set-env-vars LLM_ENGINE=claude,PIA_USER_ID=default,GOOGLE_OAUTH_REDIRECT_URI=https://pia-backend-REPLACE_WITH_CLOUD_RUN_URL.a.run.app/api/calendar/callback
 ```
 
-Set secrets such as `calude_key`, `OpenAI_Key`, `ELEVENLABS_API_KEY`, and Google OAuth
+Set secrets such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, and Google OAuth
 credentials as Cloud Run environment variables or Secret Manager-backed env vars. Never
 commit real secrets.
+
+Calendar read uses OAuth token storage. Locally, the token is written to the ignored file
+`users/default/google_calendar_token.json`. On Cloud Run, use `GOOGLE_CALENDAR_TOKEN_JSON`
+or Secret Manager-backed env vars after the first OAuth connection; otherwise the token may
+only live for the lifetime of a container instance.
 
 Frontend:
 

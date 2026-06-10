@@ -66,9 +66,9 @@ async def generate_response(
 # ── Claude ────────────────────────────────────────────────────────────────────
 
 async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
-    api_key = os.getenv("calude_key")
+    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        raise ValueError("calude_key is not set in environment")
+        raise ValueError("ANTHROPIC_API_KEY is not set in environment")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
@@ -96,9 +96,9 @@ async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
 # ── GPT-4o ────────────────────────────────────────────────────────────────────
 
 async def _call_gpt4o(system_prompt: str, messages: list[dict]) -> str:
-    api_key = os.getenv("OpenAI_Key")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OpenAI_Key is not set in environment")
+        raise ValueError("OPENAI_API_KEY is not set in environment")
 
     full_messages = [{"role": "system", "content": system_prompt}] + messages
 
