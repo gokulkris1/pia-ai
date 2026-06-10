@@ -136,10 +136,6 @@
     }
 
     ctx.globalCompositeOperation = 'source-over';
-    if (state === 'idle' || state === 'listening') {
-      ctx.fillStyle = `rgba(255,255,255,${0.012 + breathe * 0.012})`;
-      for (let y = 0; y < height; y += 6) ctx.fillRect(0, y, width, 1);
-    }
 
     requestAnimationFrame(draw);
   }

@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="theme-color" content="#05070a" />
   <title>Pia</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260610-state-clarity" />
+  <link rel="stylesheet" href="/static/style.css?v=20260610-aurora" />
 </head>
 <body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
   <main class="app-shell" aria-label="Pia voice interface">
     <header class="top-bar">
       <button class="icon-button" type="button" aria-label="Menu">
@@ -19,14 +21,17 @@
       </button>
     </header>
 
-    <section class="mode-band" aria-label="Pia modes">
-      <span class="mode-chip">claude</span>
-      <span class="mode-chip">ask first</span>
-      <span class="mode-chip">1 agent</span>
+    <section class="context-bar" aria-label="Pia context">
+      <span class="context-item"><span class="context-dot" aria-hidden="true"></span>claude</span>
+      <span class="context-item">ask first</span>
+      <span class="context-item">1 agent</span>
     </section>
 
     <section class="orb-band" aria-label="Pia orb">
-      <canvas id="orb-canvas" class="orb-canvas" width="720" height="720"></canvas>
+      <div class="orb-stage">
+        <canvas id="orb-canvas" class="orb-canvas" width="720" height="720"></canvas>
+        <div class="orb-floor" aria-hidden="true"></div>
+      </div>
     </section>
 
     <section class="status-band" aria-live="polite">
@@ -55,8 +60,8 @@
     </footer>
   </main>
 
-  <script src="/static/config.js?v=20260610-state-clarity"></script>
-  <script src="/static/orb.js?v=20260610-state-clarity"></script>
-  <script src="/static/app.js?v=20260610-state-clarity"></script>
+  <script src="/static/config.js?v=20260610-aurora"></script>
+  <script src="/static/orb.js?v=20260610-aurora"></script>
+  <script src="/static/app.js?v=20260610-aurora"></script>
 </body>
 </html>
