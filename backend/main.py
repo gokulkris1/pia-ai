@@ -102,6 +102,14 @@ class CalendarReadResponse(BaseModel):
 
 class CalendarWriteRequest(BaseModel):
     text: str
+    session_id: str | None = None
+
+
+class CalendarConfirmRequest(BaseModel):
+    session_id: str
+    confirmation: str
+    proposal_id: str | None = None
+    proposal: dict | None = None
 
 
 class CalendarWriteResponse(BaseModel):
@@ -199,6 +207,7 @@ async def calendar_read(q: str = Query("what's on my calendar tomorrow")):
 async def calendar_propose(req: CalendarWriteRequest):
     """Propose a calendar write. This never writes to Google Calendar."""
     timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
+    session = _get_session(req.session_id) if req.session_id else None
     try:
         proposal = propose_calendar_write(PROJECT_ROOT, DEFAULT_USER_ID, req.text, timezone_name)
     except CalendarNotConnectedError:
@@ -210,6 +219,10 @@ async def calendar_propose(req: CalendarWriteRequest):
     if proposal.get("action") == "needs_detail":
         return CalendarWriteResponse(status="needs_detail", reply=proposal["reply"])
 
+    proposal = _assign_proposal_id(proposal)
+    if session:
+        session.pending_calendar_action = proposal
+
     return CalendarWriteResponse(
         status="proposal",
         reply=proposal["confirmation_prompt"],
@@ -218,11 +231,34 @@ async def calendar_propose(req: CalendarWriteRequest):
 
 
 @app.post("/api/calendar/confirm", response_model=CalendarWriteResponse)
-async def calendar_confirm(proposal: dict):
-    """Execute an already-confirmed calendar write proposal."""
+async def calendar_confirm(req: CalendarConfirmRequest):
+    """Execute a session's pending calendar proposal after explicit confirmation."""
+    session = _get_session(req.session_id)
+    pending = session.pending_calendar_action
+    if not pending:
+        return CalendarWriteResponse(
+            status="no_pending_proposal",
+            reply="I don't have a calendar change waiting for confirmation.",
+        )
+
+    requested_id = req.proposal_id or (req.proposal or {}).get("proposal_id")
+    if not requested_id or requested_id != pending.get("proposal_id"):
+        return CalendarWriteResponse(
+            status="proposal_mismatch",
+            reply="That confirmation does not match the calendar change I'm holding.",
+        )
+
+    if not is_confirmation(req.confirmation):
+        return CalendarWriteResponse(
+            status="not_confirmed",
+            reply="Say yes to confirm the calendar change, or no to leave it alone.",
+            proposal=pending,
+        )
+
     try:
         service = get_calendar_service(PROJECT_ROOT, DEFAULT_USER_ID)
-        reply = execute_calendar_action(service, proposal)
+        reply = execute_calendar_action(service, pending)
+        session.pending_calendar_action = None
     except CalendarNotConnectedError:
         return CalendarWriteResponse(
             status="not_connected",
@@ -255,6 +291,19 @@ async def start_call():
         greeting=greeting,
         persona_name=profile.persona_name,
     )
+
+
+def _get_session(session_id: str | None) -> CallSession:
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
+    session = sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found. Call /api/call/start first.")
+    return session
+
+
+def _assign_proposal_id(proposal: dict) -> dict:
+    return {**proposal, "proposal_id": proposal.get("proposal_id") or str(uuid.uuid4())}
 
 
 @app.post("/api/call/end/{session_id}")
@@ -319,6 +368,7 @@ async def chat(req: ChatRequest):
             if proposal.get("action") == "needs_detail":
                 reply = proposal["reply"]
             else:
+                proposal = _assign_proposal_id(proposal)
                 session.pending_calendar_action = proposal
                 reply = proposal["confirmation_prompt"]
         except CalendarNotConnectedError:
