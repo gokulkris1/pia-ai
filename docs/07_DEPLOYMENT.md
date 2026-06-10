@@ -56,10 +56,14 @@ Set secrets such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`,
 credentials as Cloud Run environment variables or Secret Manager-backed env vars. Never
 commit real secrets.
 
-Calendar read uses OAuth token storage. Locally, the token is written to the ignored file
+Calendar read/write uses OAuth token storage. Locally, the token is written to the ignored file
 `users/default/google_calendar_token.json`. On Cloud Run, use `GOOGLE_CALENDAR_TOKEN_JSON`
 or Secret Manager-backed env vars after the first OAuth connection; otherwise the token may
 only live for the lifetime of a container instance.
+
+When calendar write support is enabled, re-consent OAuth with
+`https://www.googleapis.com/auth/calendar.events` and update the deployed
+`GOOGLE_CALENDAR_TOKEN_JSON` secret with the new token before testing writes in Cloud Run.
 
 Frontend:
 

@@ -18,6 +18,7 @@ class CallSession:
     persona: dict[str, Any]
     started_at: datetime = field(default_factory=datetime.now)
     memory: MemoryManager = field(default_factory=MemoryManager)
+    pending_calendar_action: dict[str, Any] | None = None
     turn_count: int = 0
 
     def record_turn(self) -> None:

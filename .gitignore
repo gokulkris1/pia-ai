@@ -14,7 +14,7 @@ memory/*.json
 # Runtime user data — local-only samples/artifacts, not source-controlled
 users/default/voice_sample.*
 users/default/avatar_original.*
-users/default/google_calendar_token.json
+users/*/google_calendar_token.json
 users/*/pia_state.json
 frontend/avatar.jpg
 

@@ -92,9 +92,10 @@ re-deriving it. Newest decisions at the bottom.
 - [ ] Voice round-trip with real STT/LLM/TTS keys — pending first browser test with valid environment variables.
 - [x] Calendar read code implemented: Google OAuth start/callback, ignored local token storage, `/api/calendar/status`, `/api/calendar/read`, and narrow `/api/chat` read intent are wired.
 - [x] Calendar read OAuth/browser validation — local and deployed `hellopia` Cloud Run reads are verified against the founder's Google Calendar.
-- [ ] Calendar write — next Milestone 1 step; writes remain ask-first.
+- [x] Calendar write ask-first code implemented: create/move/cancel intents produce a plain-language proposal, wait for explicit confirmation, then execute through Google Calendar.
+- [ ] Calendar write OAuth/browser validation — pending re-consent with `calendar.events` scope and founder account test.
 
 ## Next action
 
-Run the first voice-loop + calendar-read test with real keys and Google OAuth credentials,
-then build calendar-write (ask-first).
+Re-consent Google OAuth with calendar write scope, then test create/move/cancel on the
+founder's real calendar.

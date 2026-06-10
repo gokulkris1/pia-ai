@@ -56,6 +56,10 @@ For local OAuth testing, the callback stores the token at
 setting `GOOGLE_CALENDAR_TOKEN_JSON` or Secret Manager-backed env vars after the first OAuth
 connection so token persistence does not depend on container filesystem lifetime.
 
+Calendar writes require the Google scope `https://www.googleapis.com/auth/calendar.events`.
+If a token was created during the read-only step, delete the local token or revisit
+`/api/calendar/auth` and approve the expanded access before testing create/move/cancel.
+
 ## Repo layout
 
 ```text

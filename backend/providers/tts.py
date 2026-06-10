@@ -163,7 +163,7 @@ async def clone_voice_elevenlabs(
                 headers={"xi-api-key": api_key},
                 data={
                     "name":        voice_name,
-                    "description": f"Cloned voice for {voice_name} AI twin",
+                    "description": f"Cloned voice for {voice_name} Pia profile",
                 },
                 files={
                     "files": (f"voice_sample.{ext}", audio_bytes, mime_type),

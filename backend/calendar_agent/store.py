@@ -22,7 +22,10 @@ def load_credentials(project_root: Path, user_id: str, scopes: list[str]) -> Cre
     token_json = os.getenv(TOKEN_ENV)
     if token_json:
         try:
-            return Credentials.from_authorized_user_info(json.loads(token_json), scopes=scopes)
+            token_info = json.loads(token_json)
+            if not _has_required_scopes(token_info, scopes):
+                return None
+            return Credentials.from_authorized_user_info(token_info, scopes=scopes)
         except Exception as err:
             print(f"[calendar] Failed to load {TOKEN_ENV}: {err}")
             return None
@@ -32,7 +35,10 @@ def load_credentials(project_root: Path, user_id: str, scopes: list[str]) -> Cre
         return None
 
     try:
-        return Credentials.from_authorized_user_file(str(path), scopes=scopes)
+        token_info = json.loads(path.read_text(encoding="utf-8"))
+        if not _has_required_scopes(token_info, scopes):
+            return None
+        return Credentials.from_authorized_user_info(token_info, scopes=scopes)
     except Exception as err:
         print(f"[calendar] Failed to load token file {path}: {err}")
         return None
@@ -69,3 +75,10 @@ def get_valid_credentials(project_root: Path, user_id: str, scopes: list[str]) -
 def has_credentials(project_root: Path, user_id: str, scopes: list[str]) -> bool:
     credentials = get_valid_credentials(project_root, user_id, scopes)
     return bool(credentials and credentials.valid)
+
+
+def _has_required_scopes(token_info: dict, required_scopes: list[str]) -> bool:
+    granted = set(token_info.get("scopes") or [])
+    if not granted:
+        return True
+    return set(required_scopes).issubset(granted)

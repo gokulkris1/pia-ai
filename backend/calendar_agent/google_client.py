@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 
 from calendar_agent.store import get_valid_credentials, save_credentials
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
