@@ -53,7 +53,6 @@ def get_authorization_url() -> str:
     flow = build_auth_flow()
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
     )
     return authorization_url
