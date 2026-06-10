@@ -4,7 +4,7 @@
 
   const ctx = canvas.getContext('2d');
   const points = [];
-  const totalPoints = 720;
+  const totalPoints = 980;
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
   let state = 'idle';
   let inputAnalyser = null;
@@ -12,6 +12,8 @@
   let inputData = null;
   let outputData = null;
   let rotation = 0;
+  let visualState = 'idle';
+  let stateMix = 1;
 
   for (let index = 0; index < totalPoints; index += 1) {
     const y = 1 - (index / (totalPoints - 1)) * 2;
@@ -21,12 +23,27 @@
   }
 
   const palettes = {
-    idle: { core: [82, 212, 255], glow: [65, 160, 205], speed: 0.0022, pulse: 0.9 },
-    listening: { core: [104, 230, 255], glow: [72, 190, 210], speed: 0.0035, pulse: 1.15 },
-    thinking: { core: [190, 150, 255], glow: [120, 90, 220], speed: 0.0065, pulse: 1.05 },
-    speaking: { core: [235, 252, 255], glow: [104, 230, 255], speed: 0.005, pulse: 1.35 },
-    alert: { core: [255, 202, 111], glow: [235, 145, 55], speed: 0.0048, pulse: 1.2 },
+    idle: { core: [120, 218, 232], glow: [58, 150, 178], speed: 0.0018, pulse: 0.9, spread: 0.292 },
+    listening: { core: [134, 238, 232], glow: [72, 190, 186], speed: 0.0031, pulse: 1.12, spread: 0.304 },
+    thinking: { core: [190, 156, 245], glow: [119, 92, 216], speed: 0.0056, pulse: 1.06, spread: 0.286 },
+    speaking: { core: [245, 253, 252], glow: [119, 230, 229], speed: 0.0044, pulse: 1.32, spread: 0.318 },
+    alert: { core: [255, 206, 118], glow: [232, 148, 65], speed: 0.004, pulse: 1.16, spread: 0.298 },
   };
+
+  function mixPalette() {
+    if (visualState === state) return palettes[state] || palettes.idle;
+    stateMix = Math.min(1, stateMix + 0.055);
+    const from = palettes[visualState] || palettes.idle;
+    const to = palettes[state] || palettes.idle;
+    if (stateMix >= 1) visualState = state;
+    return {
+      core: from.core.map((value, index) => value + (to.core[index] - value) * stateMix),
+      glow: from.glow.map((value, index) => value + (to.glow[index] - value) * stateMix),
+      speed: from.speed + (to.speed - from.speed) * stateMix,
+      pulse: from.pulse + (to.pulse - from.pulse) * stateMix,
+      spread: from.spread + (to.spread - from.spread) * stateMix,
+    };
+  }
 
   function connectAnalyserFromStream(stream) {
     try {
@@ -69,22 +86,31 @@
     const width = canvas.width;
     const height = canvas.height;
     const center = width / 2;
-    const palette = palettes[state] || palettes.idle;
+    const palette = mixPalette();
     const audio = getAudioLevel();
-    const breathe = 0.5 + Math.sin(time * 0.0015) * 0.5;
-    const sphereRadius = width * (0.295 + audio * 0.045 + breathe * 0.01);
+    const breathe = 0.5 + Math.sin(time * 0.00125) * 0.5;
+    const sphereRadius = width * (palette.spread + audio * 0.038 + breathe * 0.008);
 
     rotation += palette.speed + audio * 0.008;
     ctx.clearRect(0, 0, width, height);
     ctx.globalCompositeOperation = 'lighter';
 
-    const bloom = ctx.createRadialGradient(center, center, 0, center, center, width * 0.36);
-    bloom.addColorStop(0, `rgba(${palette.glow.join(',')},${0.13 + audio * 0.12})`);
-    bloom.addColorStop(0.45, `rgba(${palette.glow.join(',')},${0.045 + breathe * 0.035})`);
+    const bloom = ctx.createRadialGradient(center, center, width * 0.03, center, center, width * 0.38);
+    bloom.addColorStop(0, `rgba(${palette.glow.map(Math.round).join(',')},${0.16 + audio * 0.12})`);
+    bloom.addColorStop(0.42, `rgba(${palette.glow.map(Math.round).join(',')},${0.052 + breathe * 0.032})`);
     bloom.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = bloom;
     ctx.beginPath();
-    ctx.arc(center, center, width * 0.37, 0, Math.PI * 2);
+    ctx.arc(center, center, width * 0.39, 0, Math.PI * 2);
+    ctx.fill();
+
+    const lens = ctx.createRadialGradient(center, center, width * 0.1, center, center, width * 0.32);
+    lens.addColorStop(0, 'rgba(255,255,255,0.035)');
+    lens.addColorStop(0.58, 'rgba(255,255,255,0.012)');
+    lens.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = lens;
+    ctx.beginPath();
+    ctx.arc(center, center, width * 0.31, 0, Math.PI * 2);
     ctx.fill();
 
     const sinY = Math.sin(rotation);
@@ -98,28 +124,35 @@
       const y1 = point.y * cosX - z1 * sinX;
       const z2 = point.y * sinX + z1 * cosX;
       const depth = (z2 + 1) / 2;
-      const size = 0.62 + depth * 1.55 + audio * 1.25;
-      const alpha = (0.08 + depth * 0.66) * palette.pulse * (0.82 + point.seed * 0.25);
+      const size = 0.48 + depth * 1.32 + audio * 1.05;
+      const alpha = (0.045 + depth * 0.72) * palette.pulse * (0.84 + point.seed * 0.24);
       const px = center + x1 * sphereRadius;
       const py = center + y1 * sphereRadius;
 
-      ctx.fillStyle = `rgba(${palette.core.join(',')},${Math.min(1, alpha)})`;
+      ctx.fillStyle = `rgba(${palette.core.map(Math.round).join(',')},${Math.min(1, alpha)})`;
       ctx.beginPath();
       ctx.arc(px, py, size, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.globalCompositeOperation = 'source-over';
-    if (state === 'idle') {
-      ctx.fillStyle = `rgba(255,255,255,${0.02 + breathe * 0.02})`;
-      for (let y = 0; y < height; y += 5) ctx.fillRect(0, y, width, 1);
+    if (state === 'idle' || state === 'listening') {
+      ctx.fillStyle = `rgba(255,255,255,${0.012 + breathe * 0.012})`;
+      for (let y = 0; y < height; y += 6) ctx.fillRect(0, y, width, 1);
     }
 
     requestAnimationFrame(draw);
   }
 
   window.PiaOrb = {
-    setState(nextState) { state = nextState || 'idle'; },
+    setState(nextState) {
+      const next = nextState || 'idle';
+      if (next !== state) {
+        visualState = state;
+        stateMix = 0;
+      }
+      state = next;
+    },
     connectInputStream(stream) { connectAnalyserFromStream(stream); },
     connectOutputElement(audioEl) { connectAnalyserFromElement(audioEl); },
   };
