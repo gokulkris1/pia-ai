@@ -30,6 +30,7 @@ function setState(nextState) {
     els.micButton.setAttribute('aria-label', nextState === 'idle' ? 'Start speaking' : 'Listening');
   }
   if (els.endButton) els.endButton.disabled = !sessionId;
+  if (nextState === 'alert') showKeyboard('I missed that. Type to Pia instead.');
   window.PiaOrb?.setState(nextState === 'thinking' ? 'thinking' : nextState);
 }
 
@@ -56,12 +57,16 @@ async function toggleConversation() {
 function toggleKeyboard() {
   if (!els.textForm || !els.textInput) return;
   const willOpen = els.textForm.hidden;
-  els.textForm.hidden = !willOpen;
-  if (willOpen) {
-    stopListening();
-    setState(sessionId ? 'idle' : 'connecting');
-    requestAnimationFrame(() => els.textInput?.focus());
-  }
+  if (willOpen) showKeyboard();
+  else els.textForm.hidden = true;
+}
+
+function showKeyboard(message = '') {
+  if (!els.textForm || !els.textInput) return;
+  stopListening();
+  els.textForm.hidden = false;
+  if (message) setTranscript(message);
+  requestAnimationFrame(() => els.textInput?.focus());
 }
 
 async function ensureTextSession() {
@@ -179,9 +184,20 @@ function startWebSpeech() {
   };
 
   recognition.onerror = (event) => {
-    if (event.error === 'no-speech' && state === 'listening') return;
     console.warn('[stt]', event.error);
-    setTranscript('I missed that. Tap and try again.');
+    if (event.error === 'no-speech') {
+      setTranscript('I missed that. Try typing it instead.');
+      setState('alert');
+      return;
+    }
+    if (activeMicStream && window.MediaRecorder && event.error !== 'not-allowed') {
+      recognition.onend = null;
+      recognition = null;
+      setTranscript('Trying a different listener. Speak once more.');
+      startWhisperTurn();
+      return;
+    }
+    setTranscript('Microphone listening failed. Type to Pia instead.');
     setState('alert');
   };
 
@@ -211,7 +227,10 @@ async function startWhisperTurn() {
       const response = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: form });
       const data = await response.json();
       if (data.transcript) await processUserSpeech(data.transcript);
-      else startListening();
+      else {
+        setTranscript('I missed that. Type to Pia instead.');
+        setState('alert');
+      }
     };
     recorder.start();
     setTimeout(() => {
