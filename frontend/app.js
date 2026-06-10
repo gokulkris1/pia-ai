@@ -12,22 +12,60 @@ let lastTranscript = '';
 
 const els = {};
 
+const STATE_COPY = {
+  idle: {
+    label: 'waiting for you',
+    subline: 'tap the mic when you want Pia',
+    pill: 'ready',
+    aria: 'Start speaking',
+  },
+  connecting: {
+    label: 'starting Pia',
+    subline: 'opening the mic and session',
+    pill: 'connecting',
+    aria: 'Connecting to Pia',
+  },
+  listening: {
+    label: 'listening now',
+    subline: 'speak naturally - Pia is hearing you',
+    pill: 'listening',
+    aria: 'Pia is listening',
+  },
+  thinking: {
+    label: 'heard you',
+    subline: 'Pia is working on the answer',
+    pill: 'thinking',
+    aria: 'Pia is thinking',
+  },
+  speaking: {
+    label: 'Pia is replying',
+    subline: 'voice is getting ready',
+    pill: 'speaking',
+    aria: 'Pia is speaking',
+  },
+  alert: {
+    label: 'needs attention',
+    subline: 'check permissions or type instead',
+    pill: 'needs attention',
+    aria: 'Pia needs attention',
+  },
+};
+
 function setState(nextState) {
   state = nextState;
-  const copy = {
-    idle: ['tap to speak', 'pia is listening for you'],
-    connecting: ['connecting', 'starting the voice loop'],
-    listening: ['listening', 'say what you need'],
-    thinking: ['thinking', 'routing through claude'],
-    speaking: ['speaking', 'pia is talking back'],
-    alert: ['needs attention', 'check permissions or try again'],
-  }[nextState] || [nextState, ''];
+  const copy = STATE_COPY[nextState] || { label: nextState, subline: '', pill: nextState, aria: nextState };
 
-  if (els.statusLine) els.statusLine.textContent = copy[0];
-  if (els.statusSubline) els.statusSubline.textContent = copy[1];
+  document.body.dataset.piaState = nextState;
+  if (els.statusLine) els.statusLine.textContent = copy.label;
+  if (els.statusSubline) els.statusSubline.textContent = copy.subline;
+  if (els.modelPill) {
+    els.modelPill.textContent = copy.pill;
+    els.modelPill.className = `model-pill ${nextState}`;
+  }
   if (els.micButton) {
     els.micButton.className = `mic-action ${nextState}`;
-    els.micButton.setAttribute('aria-label', nextState === 'idle' ? 'Start speaking' : 'Listening');
+    els.micButton.setAttribute('aria-label', copy.aria);
+    els.micButton.disabled = ['connecting', 'thinking'].includes(nextState);
   }
   if (els.endButton) els.endButton.disabled = !sessionId;
   if (nextState === 'alert') showKeyboard('I missed that. Type to Pia instead.');
@@ -144,7 +182,7 @@ async function primeMicrophone() {
 function startListening() {
   if (!sessionId) return;
   setState('listening');
-  setTranscript('');
+  setTranscript('Pia is listening.');
 
   const hasWebSpeech = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
   if (STT_MODE === 'webspeech' && hasWebSpeech) startWebSpeech();
@@ -178,7 +216,7 @@ function startWebSpeech() {
     }
 
     const text = (final || interim).trim();
-    if (text) setTranscript(text);
+    if (text) setTranscript(resultLabel(final ? 'Heard' : 'Hearing', text));
     if (final.trim()) {
       lastTranscript = final.trim();
       processUserSpeech(lastTranscript);
@@ -250,7 +288,7 @@ async function processUserSpeech(text, options = {}) {
   const resumeListening = options.resumeListening !== false;
   stopListening();
   setState('thinking');
-  setTranscript(`You: ${text}`);
+  setTranscript(resultLabel('Heard', text));
 
   try {
     const chatRes = await apiFetch('/api/chat', 'POST', {
@@ -296,6 +334,10 @@ async function piaSpeaks(text) {
   }
 }
 
+function resultLabel(prefix, text) {
+  return `${prefix}: ${text}`;
+}
+
 function stopAudio() {
   if (!audioEl) return;
   audioEl.pause();
@@ -328,6 +370,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   els.keyboardButton = document.getElementById('keyboard-button');
   els.textForm = document.getElementById('text-form');
   els.textInput = document.getElementById('text-input');
+  els.modelPill = document.getElementById('model-pill');
 
   els.micButton?.addEventListener('click', toggleConversation);
   els.endButton?.addEventListener('click', endConversation);

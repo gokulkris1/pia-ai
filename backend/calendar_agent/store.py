@@ -4,11 +4,15 @@ import json
 import os
 from pathlib import Path
 
+import google.auth
 from google.auth.transport.requests import Request
+from google.auth.transport.requests import AuthorizedSession
 from google.oauth2.credentials import Credentials
 
 TOKEN_ENV = "GOOGLE_CALENDAR_TOKEN_JSON"
 TOKEN_PATH_ENV = "GOOGLE_CALENDAR_TOKEN_PATH"
+TOKEN_SECRET_ENV = "GOOGLE_CALENDAR_TOKEN_SECRET"
+PROJECT_ENV = "GOOGLE_CLOUD_PROJECT"
 
 
 def token_path(project_root: Path, user_id: str) -> Path:
@@ -46,11 +50,13 @@ def load_credentials(project_root: Path, user_id: str, scopes: list[str]) -> Cre
 def save_credentials(project_root: Path, user_id: str, credentials: Credentials) -> Path:
     path = token_path(project_root, user_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(credentials.to_json(), encoding="utf-8")
+    token_json = credentials.to_json()
+    path.write_text(token_json, encoding="utf-8")
     try:
         path.chmod(0o600)
     except OSError:
         pass
+    _save_credentials_secret(token_json)
     return path
 
 
@@ -81,3 +87,29 @@ def _has_required_scopes(token_info: dict, required_scopes: list[str]) -> bool:
     if not granted:
         return True
     return set(required_scopes).issubset(granted)
+
+
+def _save_credentials_secret(token_json: str) -> None:
+    secret_id = os.getenv(TOKEN_SECRET_ENV)
+    project_id = os.getenv(PROJECT_ENV)
+    if not secret_id or not project_id:
+        return
+
+    try:
+        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        session = AuthorizedSession(credentials)
+        response = session.post(
+            f"https://secretmanager.googleapis.com/v1/projects/{project_id}/secrets/{secret_id}:addVersion",
+            json={"payload": {"data": _base64(token_json)}},
+            timeout=10,
+        )
+        if response.status_code >= 300:
+            print(f"[calendar] Failed to persist token secret: {response.status_code} {response.text}")
+    except Exception as err:
+        print(f"[calendar] Failed to persist token secret: {err}")
+
+
+def _base64(value: str) -> str:
+    import base64
+
+    return base64.b64encode(value.encode("utf-8")).decode("ascii")

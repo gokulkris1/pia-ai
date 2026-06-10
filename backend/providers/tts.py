@@ -33,7 +33,7 @@ async def synthesize_speech(
 ) -> bytes:
     """
     Convert text to speech.
-    Tries ElevenLabs first; on any failure falls back to OpenAI TTS.
+    Uses fast OpenAI TTS by default; can try ElevenLabs first with TTS_ENGINE=elevenlabs.
 
     Args:
         text:              the text to speak
@@ -44,11 +44,14 @@ async def synthesize_speech(
         MP3 audio bytes
     """
     text = _clean_for_tts(text)
-    try:
-        return await _call_elevenlabs(text, voice_id, settings_override)
-    except Exception as el_err:
-        print(f"[tts] ElevenLabs failed ({el_err}) — falling back to OpenAI TTS")
-        return await _call_openai_tts(text)
+    engine = (_env_value("TTS_ENGINE") or "openai").lower()
+    if engine == "elevenlabs":
+        try:
+            return await _call_elevenlabs(text, voice_id, settings_override)
+        except Exception as el_err:
+            print(f"[tts] ElevenLabs failed ({el_err}) — falling back to OpenAI TTS")
+
+    return await _call_openai_tts(text)
 
 
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
@@ -111,7 +114,7 @@ async def _call_openai_tts(text: str) -> bytes:
                 "Content-Type":  "application/json",
             },
             json={
-                "model": "tts-1-hd",   # hd = higher quality, less robotic
+                "model": "tts-1",
                 "input": text,
                 "voice": "onyx",       # onyx: warm, deep, natural; options: alloy echo fable onyx nova shimmer
             },

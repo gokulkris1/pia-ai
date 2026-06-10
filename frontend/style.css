@@ -157,6 +157,37 @@ input { font: inherit; }
 .model-pill {
   background: rgba(139, 224, 182, 0.07);
   color: rgba(244, 248, 251, 0.52);
+  min-width: 104px;
+  text-align: center;
+  text-transform: lowercase;
+  transition: color .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.model-pill.listening {
+  border-color: rgba(104, 230, 255, 0.46);
+  background: rgba(104, 230, 255, 0.13);
+  color: rgba(244, 253, 255, 0.9);
+  box-shadow: 0 0 22px rgba(104, 230, 255, 0.12);
+}
+
+.model-pill.thinking {
+  border-color: rgba(180, 140, 255, 0.48);
+  background: rgba(180, 140, 255, 0.13);
+  color: rgba(248, 244, 255, 0.9);
+  box-shadow: 0 0 22px rgba(180, 140, 255, 0.12);
+}
+
+.model-pill.speaking {
+  border-color: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.13);
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 26px rgba(104, 230, 255, 0.18);
+}
+
+.model-pill.alert {
+  border-color: rgba(255, 199, 107, 0.62);
+  background: rgba(255, 199, 107, 0.14);
+  color: rgba(255, 235, 204, 0.95);
 }
 
 .transcript {
@@ -231,6 +262,7 @@ input { font: inherit; }
 }
 
 .mic-action {
+  position: relative;
   width: 86px;
   height: 86px;
   border: 1px solid rgba(104, 230, 255, 0.52);
@@ -249,12 +281,34 @@ input { font: inherit; }
   transition: border-color .22s ease, box-shadow .22s ease, background .22s ease, transform .18s ease;
 }
 
+.mic-action:disabled {
+  cursor: wait;
+}
+
 .mic-action.listening {
   border-color: rgba(104, 230, 255, 0.86);
   box-shadow:
     0 0 0 11px rgba(104,230,255,0.1),
     0 0 62px rgba(104,230,255,0.42),
     inset 0 0 30px rgba(255,255,255,0.2);
+}
+
+.mic-action.listening::before,
+.mic-action.speaking::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 1px solid rgba(104, 230, 255, 0.28);
+  animation: mic-ring 1.5s ease-out infinite;
+  pointer-events: none;
+}
+
+.mic-action.speaking::before {
+  border-color: rgba(255, 255, 255, 0.28);
+  animation-duration: 1.05s;
 }
 
 .mic-action.thinking {
@@ -270,6 +324,11 @@ input { font: inherit; }
 .mic-action.alert {
   border-color: rgba(255, 199, 107, 0.92);
   box-shadow: 0 0 54px rgba(255,199,107,0.35), inset 0 0 24px rgba(255,255,255,0.14);
+}
+
+@keyframes mic-ring {
+  from { transform: translate(-50%, -50%) scale(0.86); opacity: 0.7; }
+  to { transform: translate(-50%, -50%) scale(1.22); opacity: 0; }
 }
 
 @media (max-height: 680px) {
