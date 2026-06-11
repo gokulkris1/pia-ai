@@ -94,3 +94,35 @@ def test_config_is_public_and_env_swappable(app_module, monkeypatch):
     assert cfg["assistantOverrides"]["voice"]["voiceId"] == "voiceXYZ"
     assert cfg["assistantOverrides"]["voice"]["model"] == "eleven_flash_v2_5"
     assert cfg["assistantOverrides"]["transcriber"]["provider"] == "deepgram"
+
+
+def test_config_defaults_to_hope_voice(app_module, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_VOICE_ID", raising=False)
+
+    cfg = TestClient(app_module.app).get("/api/voice/config").json()
+    # Hope is the default voice + listed first in the dev switcher shortlist.
+    assert cfg["voiceId"] == "zGjIP4SZlMnY9m93k97r"
+    assert cfg["assistantOverrides"]["voice"]["voiceId"] == "zGjIP4SZlMnY9m93k97r"
+    assert cfg["devVoices"][0]["id"] == "zGjIP4SZlMnY9m93k97r"
+    assert {v["id"] for v in cfg["devVoices"]} == {
+        "zGjIP4SZlMnY9m93k97r",
+        "EQx6HGDYjkDpcli6vorJ",
+        "0WKkG7JmcKK7MkwhnMIe",
+        "6fZce9LFNG3iEITDfqZZ",
+    }
+    # Stability ~45% / high similarity as requested.
+    assert cfg["assistantOverrides"]["voice"]["stability"] == 0.45
+    assert cfg["assistantOverrides"]["voice"]["similarityBoost"] == 0.9
+
+
+def test_dev_voice_override_is_allow_listed(app_module, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_VOICE_ID", raising=False)
+    client = TestClient(app_module.app)
+
+    # A hardcoded dev voice is honoured.
+    cfg = client.get("/api/voice/config?voiceId=EQx6HGDYjkDpcli6vorJ").json()
+    assert cfg["voiceId"] == "EQx6HGDYjkDpcli6vorJ"
+
+    # Anything not on the allow-list falls back to the default (no arbitrary voice).
+    cfg = client.get("/api/voice/config?voiceId=not-a-real-voice").json()
+    assert cfg["voiceId"] == "zGjIP4SZlMnY9m93k97r"

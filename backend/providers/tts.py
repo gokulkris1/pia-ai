@@ -65,11 +65,11 @@ async def _call_elevenlabs(
     if not api_key:
         raise ValueError("ELEVENLABS_API_KEY is not set")
 
-    voice_id = voice_id or _env_value("ELEVENLABS_VOICE_ID") or "21m00Tcm4TlvDq8ikWAM"
+    voice_id = voice_id or _env_value("ELEVENLABS_VOICE_ID") or "zGjIP4SZlMnY9m93k97r"
 
     defaults = {
-        "stability":         0.33,   # lower = more expressive/varied
-        "similarity_boost":  0.88,   # higher = truer to the cloned voice
+        "stability":         0.45,   # ~45%: composed, consistent, still natural
+        "similarity_boost":  0.90,   # high: stays true to the chosen voice
         "style":             0.45,   # more character/emotion
         "use_speaker_boost": True,
     }

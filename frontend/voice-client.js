@@ -16,17 +16,44 @@
   let enabled = false;
   let active = false;
   let cfg = null;
+  let apiBase = '';
   let capTimer = null;
   const hooks = { onState: () => {}, onTranscript: () => {} };
+
+  // Dev-only voice auditioning. Off unless ?voicedev=1 (or window.PIA_VOICE_DEV).
+  // The chosen voice lives in sessionStorage only — transient, never persisted
+  // server-side or per-user. The backend validates the id against a hardcoded
+  // allow-list, so this can't point Pia at an arbitrary voice.
+  function devEnabled() {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      return window.PIA_VOICE_DEV === true || q.get('voicedev') === '1';
+    } catch (_) {
+      return window.PIA_VOICE_DEV === true;
+    }
+  }
+
+  function storedVoiceId() {
+    try {
+      return sessionStorage.getItem('piaVoiceId') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  async function fetchConfig(voiceId) {
+    const qs = voiceId ? `?voiceId=${encodeURIComponent(voiceId)}` : '';
+    const res = await fetch(`${apiBase}/api/voice/config${qs}`);
+    return res.json();
+  }
 
   async function init(options = {}) {
     hooks.onState = options.onState || hooks.onState;
     hooks.onTranscript = options.onTranscript || hooks.onTranscript;
-    const apiBase = options.apiBase || '';
+    apiBase = options.apiBase || '';
 
     try {
-      const res = await fetch(`${apiBase}/api/voice/config`);
-      cfg = await res.json();
+      cfg = await fetchConfig(devEnabled() ? storedVoiceId() : '');
     } catch (err) {
       console.warn('[vapi] config fetch failed — staying on classic mode', err);
       enabled = false;
@@ -45,6 +72,7 @@
       vapi = new Vapi(cfg.publicKey);
       wireEvents();
       enabled = true;
+      if (devEnabled()) mountVoiceSwitcher();
       console.log('[vapi] realtime voice enabled');
       return true;
     } catch (err) {
@@ -135,11 +163,67 @@
     return active ? stop() : start();
   }
 
+  // Re-fetch config for the picked voice, then restart any live call so the new
+  // voice is heard immediately (Vapi locks the voice in at call start).
+  async function setVoice(voiceId) {
+    try {
+      sessionStorage.setItem('piaVoiceId', voiceId || '');
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      cfg = await fetchConfig(voiceId);
+    } catch (err) {
+      console.warn('[vapi] voice switch config fetch failed', err);
+      return;
+    }
+    if (active) {
+      await stop();
+      await start();
+    }
+  }
+
+  function mountVoiceSwitcher() {
+    if (document.getElementById('pia-voice-switcher')) return;
+    const voices = (cfg && cfg.devVoices) || [];
+    if (!voices.length) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'pia-voice-switcher';
+    wrap.style.cssText =
+      'position:fixed;bottom:12px;left:12px;z-index:9999;display:flex;' +
+      'align-items:center;gap:6px;padding:6px 10px;border-radius:10px;' +
+      'background:rgba(20,20,28,.72);backdrop-filter:blur(8px);' +
+      'font:12px system-ui,sans-serif;color:#cbd5e1;';
+
+    const label = document.createElement('span');
+    label.textContent = 'voice';
+    label.style.opacity = '0.7';
+
+    const select = document.createElement('select');
+    select.style.cssText =
+      'background:#0f0f16;color:#e2e8f0;border:1px solid #2a2a38;' +
+      'border-radius:6px;padding:3px 6px;font:12px system-ui,sans-serif;';
+    voices.forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = v.label || v.id;
+      if (cfg && cfg.voiceId === v.id) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => setVoice(select.value));
+
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    document.body.appendChild(wrap);
+  }
+
   window.PiaVoice = {
     init,
     toggle,
     start,
     stop,
+    setVoice,
     isEnabled: () => enabled,
     isActive: () => active,
   };

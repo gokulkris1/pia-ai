@@ -26,6 +26,50 @@ from voice import tools as voice_tools
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
+# ── Voice selection ───────────────────────────────────────────────────────────
+# Default = Hope (warm, natural, female). The founder can swap it permanently via
+# the ELEVENLABS_VOICE_ID env var. DEV_VOICES is a hardcoded audition shortlist
+# for picking the final voice live in the real pipeline — it is NOT a user
+# setting and is never persisted per-user. The config endpoint only honours a
+# ?voiceId= override if it is one of these (or the env default), so the public
+# endpoint can't be used to point Pia at an arbitrary paid voice.
+HOPE_VOICE_ID = "zGjIP4SZlMnY9m93k97r"
+DEV_VOICES = [
+    {"id": "zGjIP4SZlMnY9m93k97r", "label": "Hope (default)"},
+    {"id": "EQx6HGDYjkDpcli6vorJ", "label": "Voice 2"},
+    {"id": "0WKkG7JmcKK7MkwhnMIe", "label": "Voice 3"},
+    {"id": "6fZce9LFNG3iEITDfqZZ", "label": "Voice 4"},
+]
+
+
+def _default_voice_id() -> str:
+    return os.getenv("ELEVENLABS_VOICE_ID", HOPE_VOICE_ID)
+
+
+def _allowed_voice_ids() -> set[str]:
+    return {_default_voice_id(), *(v["id"] for v in DEV_VOICES)}
+
+
+def _resolve_voice_id(requested: str | None) -> str:
+    """Use the dev-switcher override only if it's in the hardcoded allow-list."""
+    if requested and requested in _allowed_voice_ids():
+        return requested
+    return _default_voice_id()
+
+
+def _voice_stability() -> float:
+    try:
+        return float(os.getenv("ELEVENLABS_STABILITY", "0.45"))
+    except ValueError:
+        return 0.45
+
+
+def _voice_similarity() -> float:
+    try:
+        return float(os.getenv("ELEVENLABS_SIMILARITY", "0.9"))
+    except ValueError:
+        return 0.9
+
 # ── Cost guardrail ──────────────────────────────────────────────────────────
 # A left-open session must not run unbounded. We cap call duration (enforced by
 # Vapi via maxDurationSeconds in the client config, and surfaced to the client
@@ -121,15 +165,16 @@ async def voice_calendar_tool(request: Request):
 
 
 @router.get("/config")
-async def voice_config():
+async def voice_config(request: Request):
     """Non-secret client config for the Vapi Web SDK.
 
     Lets the founder audition/swap the ElevenLabs voice + model and STT model via
     env vars (no code change) — secrets (provider API keys, webhook secret) stay
-    on the server / in Vapi.
+    on the server / in Vapi. An optional ?voiceId= picks one of the hardcoded
+    DEV_VOICES for live auditioning; anything else falls back to the default.
     """
     max_seconds = _max_session_seconds()
-    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+    voice_id = _resolve_voice_id(request.query_params.get("voiceId"))
     eleven_model = os.getenv("ELEVENLABS_MODEL", "eleven_turbo_v2_5")
     deepgram_model = os.getenv("DEEPGRAM_MODEL", "nova-2")
 
@@ -139,6 +184,9 @@ async def voice_config():
         "publicKey": os.getenv("VAPI_PUBLIC_KEY", ""),
         "assistantId": os.getenv("VAPI_ASSISTANT_ID", ""),
         "maxSessionSeconds": max_seconds,
+        # Dev-only audition shortlist + current selection (not a user setting).
+        "devVoices": DEV_VOICES,
+        "voiceId": voice_id,
         # Applied as assistantOverrides so voice/STT are env-swappable at runtime.
         "assistantOverrides": {
             "maxDurationSeconds": max_seconds,
@@ -151,6 +199,8 @@ async def voice_config():
                 "provider": "11labs",
                 "voiceId": voice_id,
                 "model": eleven_model,
+                "stability": _voice_stability(),
+                "similarityBoost": _voice_similarity(),
             },
         },
     }
