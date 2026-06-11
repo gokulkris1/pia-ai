@@ -76,6 +76,31 @@ re-deriving it. Newest decisions at the bottom.
    calendar. Rename to agent-neutral conversation/session naming after the calendar read/write
    spine is working.
 
+13. **Realtime voice via Vapi — a deliberate exception to GCP-only.** The M1 voice loop is
+   sequential/blocking (STT → LLM → TTS), which feels robotic and slow. For a ChatGPT-voice
+   feel (streaming, barge-in, turn-taking) the realtime layer moves to **Vapi**, a managed
+   voice-media orchestrator. This is a conscious exception to the GCP-only rule (decision
+   #11): Vapi is a media/orchestration layer (Twilio-class), not a deploy target — the app
+   still deploys only on Cloud Run + Firebase. There is no GCP-native equivalent that does
+   bring-your-own-Claude + swappable STT/TTS + barge-in.
+   - **Decoupling is the hard requirement.** Brain / ears / mouth must be independently
+     swappable, and the voice layer must NOT become the reasoning model. Ears (STT) and
+     mouth (TTS) are Vapi provider config. The **brain stays ours**: Vapi's "custom LLM"
+     points at an OpenAI-compatible endpoint on our Cloud Run that calls the existing
+     `chooseModel()` → Claude seam (decision #5). The orchestrator only moves audio.
+   - **What survives unchanged:** calendar ask-first (Vapi tool-call → existing
+     propose→confirm→execute gate), persona (system prompt in the LLM shim), and the orb
+     (driven by Vapi client events instead of the blocking loop).
+   - **No new always-on backend.** Client uses the Vapi Web SDK (WebRTC); we only add two
+     request/response HTTP endpoints to the existing Cloud Run (LLM shim + calendar tool
+     webhook). This is the deciding factor over LiveKit/Pipecat, which need a persistent
+     agent worker.
+   - **Escape hatch:** if GCP-sovereignty or cost ever outweighs speed, migrate to
+     **self-hosted LiveKit Agents on GCE/GKE**. Because the brain, persona, and calendar
+     logic live on our Cloud Run, swapping the orchestrator never touches them.
+   - All voice work happens on the `voice-realtime` branch; the M1 voice+calendar build on
+     `main` stays as the fallback.
+
 ## Working agreement
 
 - Human does: domains, Google Cloud OAuth, Cloud Run/Firebase env vars, testing on real

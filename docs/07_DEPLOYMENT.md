@@ -11,6 +11,23 @@ Do not rewrite the FastAPI backend into serverless functions. The backend alread
 working voice loop endpoints (`/api/transcribe`, `/api/chat`, `/api/speak`,
 `/api/call/start`, `/api/call/end`), so M1 keeps that code and containers it for Cloud Run.
 
+## Exception: realtime voice orchestration (Vapi)
+
+The realtime voice layer (post-M1, on the `voice-realtime` branch) uses **Vapi**, a managed
+voice-media orchestrator. This is a **deliberate, documented exception** to GCP-only — see
+decision #13 in `06_HISTORY_AND_DECISIONS.md`. Rationale in brief:
+
+- Vapi is a media/orchestration layer (Twilio-class), not a deploy target. The app still
+  deploys only on **Cloud Run + Firebase**.
+- The brain stays ours and swappable: Vapi's "custom LLM" calls an OpenAI-compatible
+  endpoint on our Cloud Run that wraps `chooseModel()` → Claude. STT and TTS are swappable
+  Vapi provider config. The orchestrator never reasons.
+- No new always-on service: only two HTTP endpoints are added to the existing Cloud Run
+  (LLM shim + calendar tool webhook); the client uses the Vapi Web SDK (WebRTC).
+- **Escape hatch:** if GCP-sovereignty or cost ever outweighs speed, migrate to
+  **self-hosted LiveKit Agents on GCE/GKE**, which keeps everything inside GCP. The brain,
+  persona, and calendar logic are unaffected because they live on our Cloud Run.
+
 ## Repo reality
 
 - `Dockerfile` builds the existing FastAPI backend and copies `frontend/`, `users/`, and
