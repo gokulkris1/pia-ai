@@ -50,8 +50,12 @@ from calendar_agent.actions import (
 from calendar_agent.intent import get_time_window, is_calendar_read_intent
 from calendar_agent.store import has_credentials
 from calendar_agent.google_client import SCOPES
+from voice.routes import router as voice_router
 
 app = FastAPI(title="PIA Backend", version="1.0.0")
+
+# Realtime voice (Vapi) endpoints — auth-gated server-to-server webhooks.
+app.include_router(voice_router)
 
 # CORS — allow all for local dev
 app.add_middleware(
