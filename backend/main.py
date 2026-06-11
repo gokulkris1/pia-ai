@@ -50,6 +50,7 @@ from calendar_agent.actions import (
 from calendar_agent.intent import get_time_window, is_calendar_read_intent
 from calendar_agent.store import has_credentials
 from calendar_agent.google_client import SCOPES
+from calendar_agent import service as calendar_service
 from voice.routes import router as voice_router
 
 app = FastAPI(title="PIA Backend", version="1.0.0")
@@ -187,23 +188,12 @@ async def calendar_status():
 async def calendar_read(q: str = Query("what's on my calendar tomorrow")):
     """Read calendar events for a narrow natural-language time window."""
     timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
-    start, end, label = get_time_window(q, timezone_name)
-
-    try:
-        events = read_events(PROJECT_ROOT, DEFAULT_USER_ID, start, end)
-    except CalendarNotConnectedError:
-        return CalendarReadResponse(
-            connected=False,
-            label=label,
-            events=[],
-            reply="Calendar is not connected yet. Open /api/calendar/auth first, then ask me again.",
-        )
-
+    result = calendar_service.read_calendar(PROJECT_ROOT, DEFAULT_USER_ID, q, timezone_name)
     return CalendarReadResponse(
-        connected=True,
-        label=label,
-        events=events,
-        reply=format_events_for_voice(events, label),
+        connected=result["connected"],
+        label=result["label"],
+        events=result["events"],
+        reply=result["reply"],
     )
 
 
@@ -212,25 +202,13 @@ async def calendar_propose(req: CalendarWriteRequest):
     """Propose a calendar write. This never writes to Google Calendar."""
     timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
     session = _get_session(req.session_id) if req.session_id else None
-    try:
-        proposal = propose_calendar_write(PROJECT_ROOT, DEFAULT_USER_ID, req.text, timezone_name)
-    except CalendarNotConnectedError:
-        return CalendarWriteResponse(
-            status="not_connected",
-            reply="Calendar needs write access. Open /api/calendar/auth, approve access, then ask me again.",
-        )
-
-    if proposal.get("action") == "needs_detail":
-        return CalendarWriteResponse(status="needs_detail", reply=proposal["reply"])
-
-    proposal = _assign_proposal_id(proposal)
-    if session:
-        session.pending_calendar_action = proposal
-
+    result = calendar_service.propose_change(
+        PROJECT_ROOT, DEFAULT_USER_ID, session, req.text, timezone_name
+    )
     return CalendarWriteResponse(
-        status="proposal",
-        reply=proposal["confirmation_prompt"],
-        proposal=proposal,
+        status=result["status"],
+        reply=result["reply"],
+        proposal=result.get("proposal"),
     )
 
 
@@ -238,37 +216,23 @@ async def calendar_propose(req: CalendarWriteRequest):
 async def calendar_confirm(req: CalendarConfirmRequest):
     """Execute a session's pending calendar proposal after explicit confirmation."""
     session = _get_session(req.session_id)
-    pending = session.pending_calendar_action
-    if not pending:
-        return CalendarWriteResponse(
-            status="no_pending_proposal",
-            reply="I don't have a calendar change waiting for confirmation.",
-        )
 
+    # HTTP confirms must carry the proposal id (the voice path supplies it too).
     requested_id = req.proposal_id or (req.proposal or {}).get("proposal_id")
-    if not requested_id or requested_id != pending.get("proposal_id"):
+    if session.pending_calendar_action and not requested_id:
         return CalendarWriteResponse(
             status="proposal_mismatch",
             reply="That confirmation does not match the calendar change I'm holding.",
         )
 
-    if not is_confirmation(req.confirmation):
-        return CalendarWriteResponse(
-            status="not_confirmed",
-            reply="Say yes to confirm the calendar change, or no to leave it alone.",
-            proposal=pending,
-        )
-
-    try:
-        service = get_calendar_service(PROJECT_ROOT, DEFAULT_USER_ID)
-        reply = execute_calendar_action(service, pending)
-        session.pending_calendar_action = None
-    except CalendarNotConnectedError:
-        return CalendarWriteResponse(
-            status="not_connected",
-            reply="Calendar needs write access. Open /api/calendar/auth, approve access, then ask me again.",
-        )
-    return CalendarWriteResponse(status="executed", reply=reply)
+    result = calendar_service.confirm_pending(
+        PROJECT_ROOT, DEFAULT_USER_ID, session, req.confirmation, requested_id
+    )
+    return CalendarWriteResponse(
+        status=result["status"],
+        reply=result["reply"],
+        proposal=result.get("proposal"),
+    )
 
 
 @app.post("/api/call/start", response_model=StartCallResponse)
@@ -348,15 +312,12 @@ async def chat(req: ChatRequest):
 
     if session.pending_calendar_action:
         if is_confirmation(req.user_message):
-            try:
-                service = get_calendar_service(PROJECT_ROOT, DEFAULT_USER_ID)
-                reply = execute_calendar_action(service, session.pending_calendar_action)
-                session.pending_calendar_action = None
-            except CalendarNotConnectedError:
-                reply = "Calendar needs write access. Open /api/calendar/auth, approve access, then ask me again."
+            result = calendar_service.confirm_pending(
+                PROJECT_ROOT, DEFAULT_USER_ID, session, req.user_message
+            )
+            reply = result["reply"]
         elif is_decline(req.user_message):
-            session.pending_calendar_action = None
-            reply = "Okay, I won't change your calendar."
+            reply = calendar_service.decline_pending(session)["reply"]
         else:
             reply = "Still holding that calendar change. Say yes to confirm it, or no to leave it alone."
 
@@ -367,16 +328,9 @@ async def chat(req: ChatRequest):
 
     if is_calendar_write_intent(req.user_message):
         timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
-        try:
-            proposal = propose_calendar_write(PROJECT_ROOT, DEFAULT_USER_ID, req.user_message, timezone_name)
-            if proposal.get("action") == "needs_detail":
-                reply = proposal["reply"]
-            else:
-                proposal = _assign_proposal_id(proposal)
-                session.pending_calendar_action = proposal
-                reply = proposal["confirmation_prompt"]
-        except CalendarNotConnectedError:
-            reply = "Calendar needs write access. Open /api/calendar/auth, approve access, then ask me again."
+        reply = calendar_service.propose_change(
+            PROJECT_ROOT, DEFAULT_USER_ID, session, req.user_message, timezone_name
+        )["reply"]
 
         session.memory.add("user", req.user_message)
         session.memory.add("assistant", reply)
@@ -385,12 +339,9 @@ async def chat(req: ChatRequest):
 
     if is_calendar_read_intent(req.user_message):
         timezone_name = os.getenv("PIA_TIMEZONE", "Europe/Dublin")
-        start, end, label = get_time_window(req.user_message, timezone_name)
-        try:
-            events = read_events(PROJECT_ROOT, DEFAULT_USER_ID, start, end)
-            reply = format_events_for_voice(events, label)
-        except CalendarNotConnectedError:
-            reply = "Calendar is not connected yet. Open the calendar connect link at /api/calendar/auth, then ask me again."
+        reply = calendar_service.read_calendar(
+            PROJECT_ROOT, DEFAULT_USER_ID, req.user_message, timezone_name
+        )["reply"]
 
         session.memory.add("user", req.user_message)
         session.memory.add("assistant", reply)

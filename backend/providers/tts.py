@@ -76,7 +76,12 @@ async def _call_elevenlabs(
     if settings_override:
         defaults.update({k: v for k, v in settings_override.items() if k in defaults})
 
-    model_id = (settings_override or {}).get("model", "eleven_turbo_v2_5")
+    # Model resolves from: voice.json synthesis_settings → ELEVENLABS_MODEL env → low-latency default.
+    model_id = (
+        (settings_override or {}).get("model")
+        or _env_value("ELEVENLABS_MODEL")
+        or "eleven_turbo_v2_5"
+    )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
