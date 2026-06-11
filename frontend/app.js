@@ -67,12 +67,17 @@ function setState(nextState) {
     els.micButton.setAttribute('aria-label', copy.aria);
     els.micButton.disabled = ['connecting', 'thinking'].includes(nextState);
   }
-  if (els.endButton) els.endButton.disabled = !sessionId;
+  if (els.endButton) els.endButton.disabled = !sessionId && !(window.PiaVoice && window.PiaVoice.isActive());
   if (nextState === 'alert') showKeyboard('I missed that. Type to Pia instead.');
   window.PiaOrb?.setState(nextState === 'thinking' ? 'thinking' : nextState);
 }
 
 async function toggleConversation() {
+  // Realtime (Vapi) path takes over when enabled; otherwise classic loop.
+  if (window.PiaVoice?.isEnabled()) {
+    return window.PiaVoice.toggle();
+  }
+
   if (!sessionId) {
     await startConversation();
     return;
@@ -153,6 +158,11 @@ async function startConversation() {
 }
 
 async function endConversation() {
+  if (window.PiaVoice?.isEnabled()) {
+    await window.PiaVoice.stop();
+    return;
+  }
+
   stopListening();
   stopAudio();
 
@@ -376,6 +386,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   els.endButton?.addEventListener('click', endConversation);
   els.keyboardButton?.addEventListener('click', toggleKeyboard);
   els.textForm?.addEventListener('submit', submitTypedMessage);
+
+  // Initialise the realtime (Vapi) voice path. If the server config says
+  // classic mode (or the SDK can't load), this is a no-op and the classic
+  // loop below stays in charge — the guaranteed fallback.
+  if (window.PiaVoice) {
+    try {
+      await window.PiaVoice.init({
+        apiBase: API_BASE,
+        onState: (s) => setState(s),
+        onTranscript: (t) => setTranscript(t),
+      });
+    } catch (err) {
+      console.warn('[vapi] init error — classic mode', err);
+    }
+  }
 
   try {
     const health = await apiFetch('/api/health');
